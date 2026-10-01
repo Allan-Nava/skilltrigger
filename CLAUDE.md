@@ -21,6 +21,8 @@ bin/
   lib/claude.mjs       spawning claude: env minus CLAUDECODE, process-group kill
   lib/gates.mjs        the six gates and their formatting
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
+  lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
+  lib/toggles.mjs      the re-enable reminder: the gate's toggles, kept under --out
   lib/stream.mjs       the detector: one run's events → an outcome
   lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run
   lib/report.mjs       summary, verdict rule, JSON + Markdown
@@ -54,14 +56,18 @@ Do not weaken these; they are the tool's whole reason to exist.
    `not-triggered` count towards a rate. An authentication failure or API error line is
    `error`. A run whose `init` event does not list the stub is `error`.
 4. **More than 10% timeouts and errors is no verdict**, exit 3, and the run stops as
-   soon as that share of the plan is passed.
+   soon as that share of the plan is passed. **So is a query that lost every run** — the
+   share counts runs, not queries, and must not hide a whole query (ST-19).
 5. **Nothing under `~/.claude` is written.** Runs live in `mkdtemp` directories that
    are removed; every `claude -p` gets `--no-session-persistence`. Plugin install
    directories are read, never written.
 6. **Fixes are printed, never run.** The conflict gate prints `claude plugin disable`
-   and `enable`; it does not call them.
-7. **The report carries queries, counts and versions only** — no description text, no
-   paths, no stub names, no stderr.
+   and `enable`; it does not call them. It remembers them in `<out>/.skilltrigger-toggles`
+   — never under `~/.claude` — and prints the enable command while the plugin stays
+   disabled (ST-21).
+7. **The report carries queries, counts and versions only** — plus the roster's member
+   names and the model each run reported (ST-20); no description text, no paths, no stub
+   names, no stderr. The inherited environment is counted, never quoted.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 
@@ -73,7 +79,8 @@ run** — that is ST-12.
   `claude plugin disable|enable <id> --scope <scope>` exist.
 - `claude auth status` prints JSON by default with `loggedIn`.
 - `--no-session-persistence` and `--include-partial-messages` exist and work with `-p`.
-- The `init` event carries `slash_commands` (and `skills`, `model`); project commands
+- The `init` event carries `slash_commands` (and `skills`, `model`, `mcp_servers` — the last
+  unverified, read as a count and `null` when absent); project commands
   appear there by bare name. If the stub never appears, every run is an `error` — loud,
   not wrong.
 - Partial events: `stream_event` wrapping `content_block_start` (tool_use with `name`),

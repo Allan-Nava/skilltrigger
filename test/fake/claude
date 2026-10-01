@@ -6,13 +6,22 @@
 //   FAKE_CLAUDE_VERSION     what --version prints (default "2.1.268 (Claude Code)");
 //                           "fail" exits 1
 //   FAKE_CLAUDE_AUTH        in | out                       (default in)
-//   FAKE_CLAUDE_PLUGINS     none | conflict | disabled | text-conflict  (default none)
+//   FAKE_CLAUDE_PLUGINS     none | conflict | disabled | text-conflict | empty | garbage |
+//                           garbage-long | envelope | no-json-flag  (default none) —
+//                           garbage, garbage-long and envelope exit 0 with a list in no
+//                           shape the parser reads; no-json-flag rejects --json (exit 1)
+//                           and answers the human form without it
 //   FAKE_CLAUDE_PLUGIN_DIR  installPath reported for the conflicting plugin
+//   FAKE_CLAUDE_PLUGIN_STATE  enabled — overrides what the mode says about demo@market,
+//                           so "re-enabled after the measurement" can be scripted
 //   FAKE_CLAUDE_PONG        pong | auth-fail | wrong | no-init | no-roster  (default pong)
 //   FAKE_CLAUDE_COMMANDS    how many slash commands the init event lists (default 5)
 //   FAKE_CLAUDE_SKILLS      how many skills the init event lists (default 3)
 //   FAKE_CLAUDE_ROSTER_EXTRA  comma-separated extra roster entries, e.g. "demo:demo-skill"
 //   FAKE_CLAUDE_MODEL       the model the init event reports (default fake-model-1)
+//   FAKE_CLAUDE_RUN_MODEL   the model a query run's init event reports instead, so the
+//                           per-run model can differ from the preflight's
+//   FAKE_CLAUDE_MCP         how many MCP servers the init event lists (default 0)
 //   FAKE_CLAUDE_QUERIES     JSON: { "<query>": "<mode>" | ["<mode>", ...] } — an array
 //                           is consumed one entry per run of that query
 //   FAKE_CLAUDE_DEFAULT     the mode for a query not in the map (default miss)
@@ -50,9 +59,26 @@ if (argv[0] === 'auth' && argv[1] === 'status') {
 if (argv[0] === 'plugin' && argv[1] === 'list') {
   const mode = env.FAKE_CLAUDE_PLUGINS ?? 'none'
   const other = { id: 'other@market', version: '1.0.0', scope: 'user', enabled: true, installPath: join(env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent', '..', 'missing') }
-  const demo = { id: 'demo@market', version: '0.1.0', scope: 'user', enabled: mode !== 'disabled', installPath: env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent' }
-  const list = mode === 'none' ? [other] : [other, demo]
-  if (mode === 'text-conflict' || !argv.includes('--json')) {
+  const demo = { id: 'demo@market', version: '0.1.0', scope: 'user', enabled: env.FAKE_CLAUDE_PLUGIN_STATE === 'enabled' || mode !== 'disabled', installPath: env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent' }
+  const list = mode === 'none' ? [other] : mode === 'empty' ? [] : [other, demo]
+  const json = argv.includes('--json')
+  if (mode === 'garbage') {
+    console.log('Plugin listing moved to a new format\nsecond line of the new format')
+    process.exit(0)
+  }
+  if (mode === 'garbage-long') {
+    console.log(`Plugin listing ${'y'.repeat(300)}`)
+    process.exit(0)
+  }
+  if (mode === 'envelope') {
+    console.log(JSON.stringify({ plugins: list }))
+    process.exit(0)
+  }
+  if (mode === 'no-json-flag' && json) {
+    console.error("error: unknown option '--json'")
+    process.exit(1)
+  }
+  if (mode === 'text-conflict' || mode === 'no-json-flag' || !json) {
     console.log('Installed plugins:\n')
     for (const p of list) console.log(`  ❯ ${p.id}\n    Version: ${p.version}\n    Scope: ${p.scope}\n    Status: ${p.enabled ? '✔ enabled' : '✘ disabled'}\n`)
   } else console.log(JSON.stringify(list, null, 2))
@@ -78,7 +104,10 @@ const roster = (hideStub = false) => {
   const extra = (env.FAKE_CLAUDE_ROSTER_EXTRA ?? '').split(',').filter(Boolean)
   return { slash_commands: [...commands, ...extra, ...(stub && !hideStub ? [stub] : [])], skills: [...skills, ...extra] }
 }
-const init = (hideStub) => out({ type: 'system', subtype: 'init', cwd: process.cwd(), session_id: 'fake', model: model ?? env.FAKE_CLAUDE_MODEL ?? 'fake-model-1', tools: ['Bash', 'Read', 'Skill'], ...roster(hideStub) })
+const isPong = prompt === 'Reply with exactly: pong'
+const mcp = Array.from({ length: Number(env.FAKE_CLAUDE_MCP ?? 0) }, (_, i) => ({ name: `mcp-${i + 1}`, status: 'connected' }))
+const initModel = () => model ?? (!isPong && env.FAKE_CLAUDE_RUN_MODEL ? env.FAKE_CLAUDE_RUN_MODEL : env.FAKE_CLAUDE_MODEL ?? 'fake-model-1')
+const init = (hideStub) => out({ type: 'system', subtype: 'init', cwd: process.cwd(), session_id: 'fake', model: initModel(), tools: ['Bash', 'Read', 'Skill'], mcp_servers: mcp, ...roster(hideStub) })
 const se = (event) => out({ type: 'stream_event', event })
 const text = (t, extra = {}) => out({ type: 'assistant', message: { model: 'fake-model-1', role: 'assistant', content: [{ type: 'text', text: t }] }, ...extra })
 const result = (t, isError = false) => out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: t })

@@ -55,6 +55,9 @@ export async function runOnce({ query, skillName, description, model, timeoutMs,
 export async function runAll({ items, runs, skillName, description, model, timeoutMs, env, noVerdictShare, onRun = () => {}, runOnceFn = runOnce }) {
   const planned = items.length * runs
   const outcomes = items.map(() => [])
+  // The model each run's init event reported, beside its outcome: an alias can resolve to
+  // a different model than the preflight saw (ST-20).
+  const models = items.map(() => [])
   let bad = 0
   let done = 0
   let aborted = false
@@ -62,6 +65,7 @@ export async function runAll({ items, runs, skillName, description, model, timeo
     for (const [i, item] of items.entries()) {
       const res = await runOnceFn({ query: item.query, skillName, description, model, timeoutMs, env })
       outcomes[i].push(res.outcome)
+      models[i].push(res.model ?? null)
       done++
       if (res.outcome === 'timeout' || res.outcome === 'error') bad++
       onRun({ item, run: r + 1, done, planned, ...res })
@@ -71,5 +75,5 @@ export async function runAll({ items, runs, skillName, description, model, timeo
       }
     }
   }
-  return { outcomes, planned, done, aborted }
+  return { outcomes, models, planned, done, aborted }
 }

@@ -5,6 +5,40 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Added
+- The report records what `compare` needs to tell two environments apart: the roster's
+  members (names only, sorted) beside its counts; the model each run's `init` event
+  reported, per run and counted in `runModels`; and a count of what the inherited
+  environment contributed — memory files for the temporary project and for the user,
+  hooks configured, MCP servers in the `init` event — never their contents, paths or
+  names (ST-20).
+- A re-enable reminder. The toggles the conflict gate prints are remembered in
+  `.skilltrigger-toggles` under the `--out` directory, never under `~/.claude`; every
+  `preflight` that sees such a plugin still disabled, and the end of every `run`, prints
+  its `claude plugin enable …` command, until a preflight sees it enabled again or
+  uninstalled. `preflight` takes `--out` for it, defaulting to `./skilltrigger-results`
+  as `run` does. Nothing is enabled or disabled by skilltrigger itself (ST-21).
+
+### Changed
+- `compare` warns when roster members differ, listing the names added and removed, not
+  only when the counts differ; and when the models the runs reported or the inherited
+  environment's counts differ. Reports without the new fields compare as before (ST-20).
+
+### Fixed
+- A verdict no longer survives losing whole queries. The 10% rule counts runs, so two
+  positive queries could lose every run to timeouts or errors and the report still gave
+  a verdict on a smaller positives total. A query that was run and measured nothing is
+  now no verdict, exit 3, with the lost queries named in the headline and recorded as
+  `lostQueries`; a query that lost some but not all of its runs keeps the verdict and is
+  flagged, in `partialQueries`, in its row and under the table (ST-19).
+- The conflict gate no longer passes when it cannot read the plugin list. Output from
+  `claude plugin list --json` in a shape the parser does not know used to read as zero
+  plugins and the gate said `ok` with nothing checked; it now fails, quoting the first
+  line of what it got, truncated. A valid empty JSON array, or a human-form list that
+  says no plugins are installed, is still zero plugins and passes; the human-form
+  fallback for an older CLI without `--json` stays. `--allow-conflict` lets an
+  unreadable list through as a recorded warning (ST-18).
+
 ## [0.0.1] — 2026-10-01 — not released
 
 The first version, in the repository only: the gates, the runner, the report and their

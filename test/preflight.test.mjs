@@ -1,16 +1,18 @@
 // Every gate, through the CLI, against the fake claude: the ok case once, then each
 // failure on its own, and that a failure exits 2 with the reason and the fix.
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { sleepGate } from '../bin/lib/gates.mjs'
-import { SKILL, cli, fakeEnv, readLog, scratch } from './helpers.mjs'
+import { EVALS, SKILL, cli, fakeEnv, readLog, scratch } from './helpers.mjs'
 
 async function preflight(env = {}, args = []) {
   const s = scratch()
   try {
-    const r = await cli(['preflight', ...args], fakeEnv(s.dir, env))
+    // In the scratch directory, so the default --out (where the toggle reminder is kept)
+    // never lands in the repository.
+    const r = await cli(['preflight', ...args], fakeEnv(s.dir, env), { cwd: s.dir })
     return { ...r, log: readLog(s.dir) }
   } finally {
     s.cleanup()
@@ -93,6 +95,48 @@ test('conflict: --allow-conflict turns the refusal into a recorded warning', asy
 test('conflict: a disabled plugin is no conflict', async () => {
   const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'disabled' }, ['--skill', SKILL])
   assert.equal(r.code, 0, r.out)
+  assert.doesNotMatch(r.out, /re-enable/, 'a plugin the gate never asked about is not ours to remind of')
+})
+
+// ST-21: once the user disables the plugin the gate named, it is no longer a conflict, and
+// nothing used to mention it again. The gate's toggle is remembered in a small file under
+// --out (never under ~/.claude) and the enable command printed until it is enabled again.
+test('conflict: the toggle is remembered under --out, and re-enable is printed until it is done', async () => {
+  const s = scratch()
+  try {
+    const out = join(s.dir, 'results')
+    const step = (env, args) => cli(args, fakeEnv(s.dir, env), { cwd: s.dir })
+    const ENABLE = 'claude plugin enable demo@market --scope user'
+
+    const found = await step({ FAKE_CLAUDE_PLUGINS: 'conflict' }, ['preflight', '--skill', SKILL, '--out', out])
+    assert.equal(found.code, 2, found.out)
+    const state = join(out, '.skilltrigger-toggles')
+    assert.ok(existsSync(state), 'the toggle is remembered under --out')
+    assert.match(readFileSync(state, 'utf8'), /demo@market/)
+    assert.equal(existsSync(join(s.dir, 'home', '.claude')), false, 'nothing under ~/.claude')
+
+    const pre = await step({ FAKE_CLAUDE_PLUGINS: 'disabled' }, ['preflight', '--skill', SKILL, '--out', out])
+    assert.equal(pre.code, 0, pre.out)
+    assert.match(pre.out, /re-enable/)
+    assert.ok(pre.out.includes(ENABLE), pre.out)
+
+    const run = await step({ FAKE_CLAUDE_PLUGINS: 'disabled', FAKE_CLAUDE_QUERIES: JSON.stringify({ 'show me a demo of the thing': 'trigger', 'run the demo for the new feature': 'trigger' }) }, ['run', '--skill', SKILL, '--eval', EVALS, '--out', out, '--runs', '1'])
+    assert.equal(run.code, 0, run.out)
+    const tail = run.out.slice(run.out.lastIndexOf('report: '))
+    assert.ok(tail.includes(ENABLE), `the re-enable command closes the run\n${run.out}`)
+    assert.ok(!readdirSync(out).filter((f) => f.endsWith('.json')).some((f) => readFileSync(join(out, f), 'utf8').includes('demo@market')), 'the report does not carry the plugin')
+
+    // Enabled again, and no longer carrying the skill: forgotten, the file removed.
+    const back = await step({ FAKE_CLAUDE_PLUGINS: 'disabled', FAKE_CLAUDE_PLUGIN_STATE: 'enabled', FAKE_CLAUDE_PLUGIN_DIR: join(s.dir, 'no-skill-here') }, ['preflight', '--skill', SKILL, '--out', out])
+    assert.equal(back.code, 0, back.out)
+    assert.doesNotMatch(back.out, /re-enable/)
+    assert.equal(existsSync(state), false, 'nothing left to remember')
+
+    const log = readLog(s.dir)
+    assert.ok(!log.some((l) => l.argv[0] === 'plugin' && l.argv[1] !== 'list'), 'never disables or enables anything itself')
+  } finally {
+    s.cleanup()
+  }
 })
 
 test('conflict: the roster catches a shadowing skill the plain-text plugin list cannot show', async () => {
@@ -100,6 +144,57 @@ test('conflict: the roster catches a shadowing skill the plain-text plugin list 
   assert.equal(r.code, 2, r.out)
   assert.match(line(r.out, 'conflict'), /^\s*fail\b/)
   assert.match(r.out, /claude plugin disable demo@market/)
+})
+
+// ST-18: a plugin list exiting 0 in a shape the parser cannot read used to leave the list
+// empty and the gate ok with zero plugins checked — the false pass the gate exists to refuse.
+test('conflict: a plugin list that exits 0 but cannot be read fails, quoting its first line', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage' }, ['--skill', SKILL])
+  assert.equal(r.code, 2, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*fail\b.*cannot read/)
+  assert.match(line(r.out, 'conflict'), /Plugin listing moved to a new format/)
+  assert.ok(!line(r.out, 'conflict').includes('second line'), 'only the first line is quoted')
+  assert.doesNotMatch(r.out, /0 enabled plugin\(s\) checked/)
+})
+
+test('conflict: the first line quoted from an unreadable list is truncated', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage-long' }, ['--skill', SKILL])
+  assert.equal(r.code, 2, r.out)
+  const l = line(r.out, 'conflict')
+  assert.match(l, /…/)
+  assert.ok(!l.includes('y'.repeat(150)), 'not the whole line')
+})
+
+test('conflict: a JSON envelope the parser does not know is unreadable too', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'envelope' }, ['--skill', SKILL])
+  assert.equal(r.code, 2, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*fail\b.*cannot read.*\{/)
+})
+
+test('conflict: unreadable fails without --skill as well — a run would refuse on it', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage' })
+  assert.equal(r.code, 2, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*fail\b/)
+})
+
+test('conflict: an empty JSON list is zero plugins installed, and passes', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'empty' }, ['--skill', SKILL])
+  assert.equal(r.code, 0, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*ok\b.*0 enabled plugin\(s\) checked/)
+})
+
+test('conflict: an older CLI without --json falls back to the human form', async () => {
+  // The human form carries no install path, so the plugins are counted, not opened.
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'no-json-flag' }, ['--skill', SKILL])
+  assert.equal(r.code, 0, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*ok\b.*2 enabled plugin\(s\) checked/)
+  assert.ok(r.log.some((l) => l.argv[0] === 'plugin' && l.argv[1] === 'list' && !l.argv.includes('--json')), 'the plain form was asked for')
+})
+
+test('conflict: --allow-conflict lets an unreadable list through as a recorded warning', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage' }, ['--skill', SKILL, '--allow-conflict'])
+  assert.equal(r.code, 0, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*warn\b.*cannot read/)
 })
 
 test('conflict: without --skill there is nothing to compare, and it says so', async () => {

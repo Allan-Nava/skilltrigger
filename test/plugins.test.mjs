@@ -43,6 +43,21 @@ test('plugin list: the human-readable form', () => {
   assert.deepEqual(parsePluginList('No plugins installed.'), [])
 })
 
+// ST-18: "parsed, zero plugins" and "could not parse" are different answers. The first
+// lets the gate pass; the second must not, or a list in a new shape reads as no plugins.
+test('plugin list: an empty JSON array and a human "no plugins" line are zero plugins', () => {
+  assert.deepEqual(parsePluginList('[]'), [])
+  assert.deepEqual(parsePluginList('  [ ]\n'), [])
+  assert.deepEqual(parsePluginList('No plugins installed.'), [])
+  assert.deepEqual(parsePluginList('Installed plugins:\n\n  (none)\n'), [])
+})
+
+test('plugin list: output in no shape the parser knows is unreadable, not empty', () => {
+  for (const text of ['', '   \n', 'Plugin listing is temporarily unavailable', '{"plugins":[{"id":"demo@market"}]}', '[{"name":"no-id"}]', '[not json']) {
+    assert.equal(parsePluginList(text), null, JSON.stringify(text))
+  }
+})
+
 test("a plugin's skills are read off its install path", () => {
   assert.deepEqual(pluginSkills(PLUGIN), ['demo-skill'])
   assert.deepEqual(pluginSkills('/nonexistent/path'), [])
