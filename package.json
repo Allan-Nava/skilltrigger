@@ -1,0 +1,42 @@
+{
+  "name": "skilltrigger",
+  "version": "0.0.1",
+  "description": "How often a Claude Code skill's description makes the model load it, on prompts that should trigger it and near-misses that should not, measured behind gates that refuse to report a number they cannot trust.",
+  "type": "module",
+  "bin": {
+    "skilltrigger": "bin/skilltrigger.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node bin/skilltrigger.mjs check && node --test",
+    "backlog": "node scripts/backlog.mjs lint && node scripts/backlog.mjs check",
+    "build:site": "node site/build.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Allan-Nava/skilltrigger"
+  },
+  "homepage": "https://allan-nava.github.io/skilltrigger/",
+  "bugs": "https://github.com/Allan-Nava/skilltrigger/issues",
+  "keywords": [
+    "claude-code",
+    "skills",
+    "evals",
+    "trigger-rate",
+    "skill-description",
+    "measurement"
+  ],
+  "author": "Allan Nava (https://github.com/Allan-Nava)",
+  "license": "MIT",
+  "devDependencies": {
+    "marked": "^17.0.0"
+  }
+}

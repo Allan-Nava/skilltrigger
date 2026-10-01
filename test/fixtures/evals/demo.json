@@ -1,0 +1,6 @@
+[
+  { "query": "show me a demo of the thing", "should_trigger": true },
+  { "query": "run the demo for the new feature", "should_trigger": true, "note": "carried through to the report" },
+  { "query": "what is the capital of France", "should_trigger": false },
+  { "query": "write a haiku about tea", "should_trigger": false }
+]

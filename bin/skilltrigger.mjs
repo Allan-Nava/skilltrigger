@@ -1,0 +1,182 @@
+#!/usr/bin/env node
+// skilltrigger — how often a Claude Code skill's description makes the model load it,
+// measured behind gates that refuse to report a number they cannot trust.
+//
+//   skilltrigger preflight [--model M] [--skill <dir>] [--allow-conflict]
+//   skilltrigger run --skill <dir> --eval <file> [--runs 2] [--model M] [--timeout 30]
+//                    [--description "<override>"] [--out <dir>] [--allow-conflict]
+//   skilltrigger compare <a.json> <b.json>
+//   skilltrigger check
+//
+// Exit codes: 0 done · 1 usage or input error · 2 a gate failed · 3 no verdict.
+import { readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { UsageError, number, parseArgs } from './lib/args.mjs'
+import { checkRepo } from './lib/check.mjs'
+import { compare } from './lib/compare.mjs'
+import { formatGates, preflight } from './lib/gates.mjs'
+import { NO_VERDICT_SHARE, headline, summarise, writeReport } from './lib/report.mjs'
+import { runAll } from './lib/runner.mjs'
+import { loadEvalSet, loadSkill } from './lib/skill.mjs'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+
+const HELP = readFileSync(fileURLToPath(import.meta.url), 'utf8')
+  .split('\n')
+  .slice(1, 12)
+  .map((l) => l.replace(/^\/\/ ?/, ''))
+  .join('\n')
+
+async function gates({ model, skillName, allowConflict }) {
+  console.log(`skilltrigger ${pkg.version} — preflight`)
+  const pf = await preflight({ model, skillName, allowConflict })
+  console.log(formatGates(pf.gates))
+  return pf
+}
+
+async function cmdPreflight(argv) {
+  const { opts, positional } = parseArgs(argv, { model: 'string', skill: 'string', 'allow-conflict': 'boolean' })
+  if (positional.length) throw new UsageError(`unexpected argument: ${positional[0]}`)
+  const skillName = opts.skill ? loadSkill(opts.skill).name : null
+  const pf = await gates({ model: opts.model ?? null, skillName, allowConflict: Boolean(opts['allow-conflict']) })
+  if (!pf.ok) {
+    console.log('\npreflight failed — a run now would measure the failure, not the description')
+    return 2
+  }
+  console.log('\npreflight ok')
+  return 0
+}
+
+async function cmdRun(argv) {
+  const { opts, positional } = parseArgs(argv, {
+    skill: 'string',
+    eval: 'string',
+    runs: 'string',
+    model: 'string',
+    timeout: 'string',
+    description: 'string',
+    out: 'string',
+    'allow-conflict': 'boolean',
+  })
+  if (positional.length) throw new UsageError(`unexpected argument: ${positional[0]}`)
+  if (!opts.skill) throw new UsageError('run needs --skill <dir>')
+  if (!opts.eval) throw new UsageError('run needs --eval <file>')
+  const runs = number(opts, 'runs', { fallback: 2, min: 1, integer: true })
+  const timeout = number(opts, 'timeout', { fallback: 30, min: 0.1 })
+  const skill = loadSkill(opts.skill)
+  const items = loadEvalSet(opts.eval)
+  const overridden = opts.description !== undefined
+  const description = overridden ? opts.description : skill.description
+  if (!description.trim()) throw new UsageError('--description is empty')
+  const outDir = resolve(opts.out ?? 'skilltrigger-results')
+  const model = opts.model ?? null
+
+  const pf = await gates({ model, skillName: skill.name, allowConflict: Boolean(opts['allow-conflict']) })
+  if (!pf.ok) {
+    console.log('\nrefusing to run: a failed gate makes the number meaningless. Fix it and run again.')
+    return 2
+  }
+
+  const planned = items.length * runs
+  console.log(`\n${skill.name}: ${items.length} queries × ${runs} runs = ${planned}, serial, ${timeout} s timeout each`)
+  const width = String(planned).length
+  const mark = { triggered: '+', 'not-triggered': '.', timeout: 'T', error: 'E' }
+  const res = await runAll({
+    items,
+    runs,
+    skillName: skill.name,
+    description,
+    model,
+    timeoutMs: timeout * 1000,
+    env: process.env,
+    noVerdictShare: NO_VERDICT_SHARE,
+    onRun: ({ item, done, outcome, reason, ms }) => {
+      const q = item.query.length > 70 ? `${item.query.slice(0, 69)}…` : item.query
+      const why = outcome === 'timeout' || outcome === 'error' ? `  — ${reason}` : ''
+      console.log(`  [${String(done).padStart(width)}/${planned}] ${mark[outcome]} ${outcome.padEnd(13)} ${(ms / 1000).toFixed(1).padStart(5)} s  ${item.should_trigger ? 'pos' : 'neg'}  ${q}${why}`)
+    },
+  })
+  if (res.aborted) console.log(`  stopped: more than ${NO_VERDICT_SHARE * 100}% of the planned runs timed out or failed — no verdict is possible`)
+
+  const rep = summarise({
+    items,
+    outcomes: res.outcomes,
+    skillName: skill.name,
+    description,
+    overridden,
+    facts: pf.facts,
+    runsPerQuery: runs,
+    timeoutSeconds: timeout,
+    planned,
+    aborted: res.aborted,
+    toolVersion: pkg.version,
+  })
+  const files = writeReport(rep, outDir)
+  console.log(`\n${headline(rep)}`)
+  if (rep.verdict === 'ok') console.log(`per query: ${rep.totals.passed}/${rep.totals.queries} pass at a trigger rate threshold of ${rep.triggerThreshold}; no-verdict threshold ${rep.noVerdictThreshold * 100}% of runs`)
+  console.log(`report: ${files.json}\n        ${files.md}`)
+  return rep.verdict === 'ok' ? 0 : 3
+}
+
+function cmdCompare(argv) {
+  const { positional } = parseArgs(argv, {})
+  if (positional.length !== 2) throw new UsageError('compare needs two report files: compare <a.json> <b.json>')
+  const [a, b] = positional.map((f) => {
+    let r
+    try {
+      r = JSON.parse(readFileSync(f, 'utf8'))
+    } catch (e) {
+      throw new UsageError(`${f}: not a readable report (${e.message})`)
+    }
+    if (r?.tool !== 'skilltrigger' || !Array.isArray(r.queries)) throw new UsageError(`${f}: not a skilltrigger report`)
+    return r
+  })
+  console.log(compare(a, b).text)
+  return 0
+}
+
+function cmdCheck() {
+  const errors = checkRepo(ROOT)
+  for (const e of errors) console.error(`check: ${e}`)
+  if (errors.length) return 1
+  console.log(`ok — skilltrigger ${pkg.version}: CHANGELOG, README traps, no dependencies, no private strings`)
+  return 0
+}
+
+async function main() {
+  const [cmd, ...rest] = process.argv.slice(2)
+  try {
+    switch (cmd) {
+      case 'preflight':
+        return await cmdPreflight(rest)
+      case 'run':
+        return await cmdRun(rest)
+      case 'compare':
+        return cmdCompare(rest)
+      case 'check':
+        return cmdCheck()
+      case '--version':
+      case '-v':
+        console.log(pkg.version)
+        return 0
+      case undefined:
+      case 'help':
+      case '--help':
+      case '-h':
+        console.log(HELP)
+        return 0
+      default:
+        throw new UsageError(`unknown command: ${cmd}`)
+    }
+  } catch (e) {
+    // A bad skill directory or eval file is the user's input, not a crash: one line.
+    console.error(`skilltrigger: ${e.message}`)
+    if (e instanceof UsageError) console.error('run `skilltrigger help` for usage')
+    if (process.env.SKILLTRIGGER_DEBUG) console.error(e.stack)
+    return 1
+  }
+}
+
+process.exitCode = await main()

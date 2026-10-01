@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # `node >=18`, no runtime dependencies. Run the check and the tests on the floor and
+  # on every later line without `npm install`, so both claims are tested rather than
+  # stated. The tests drive a fake `claude` (test/fake/claude); no model is called, and
+  # no claude CLI is installed on the runner, so nothing could be.
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      # The command's contract against the fake, once more from the outside: a healthy
+      # CLI passes the preflight (the sleep gate warns on Linux), a logged-out one exits 2.
+      - run: |
+          export PATH="$PWD/test/fake:$PATH" FAKE_CLAUDE_PLUGIN_DIR="$PWD/test/fixtures/plugin"
+          node bin/skilltrigger.mjs preflight --skill test/fixtures/skills/demo-skill
+          set +e
+          FAKE_CLAUDE_AUTH=out node bin/skilltrigger.mjs preflight; code=$?
+          set -e
+          test "$code" = 2 || { echo "a logged-out CLI must exit 2, got $code"; exit 1; }
+
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # What `npm publish` would actually ship: bin/, README, CHANGELOG, LICENSE.
+      - run: npm pack --dry-run
+
+  # BACKLOG.md is the single source of truth; ROADMAP.md is generated from it and the
+  # issues are synced from it. A stale roadmap fails here; the planner's decisions are
+  # asserted against a fixture, because a wrong decision opens duplicates or closes
+  # open work on a public repository.
+  backlog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node scripts/backlog.mjs lint
+      - run: node scripts/backlog.mjs check
+      - run: node scripts/backlog_test.mjs

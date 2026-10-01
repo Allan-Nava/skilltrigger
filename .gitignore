@@ -1,0 +1,5 @@
+node_modules/
+site/dist/
+*.tgz
+# reports from local runs; a measurement worth keeping is copied into the docs, dated
+skilltrigger-results/

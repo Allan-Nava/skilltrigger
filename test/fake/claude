@@ -1,0 +1,205 @@
+#!/usr/bin/env node
+// A fake `claude` for the tests. It never talks to a model: every answer is scripted
+// by environment variables, so each gate and each run outcome can be produced on
+// demand. The tests put this directory first on PATH.
+//
+//   FAKE_CLAUDE_VERSION     what --version prints (default "2.1.268 (Claude Code)");
+//                           "fail" exits 1
+//   FAKE_CLAUDE_AUTH        in | out                       (default in)
+//   FAKE_CLAUDE_PLUGINS     none | conflict | disabled | text-conflict  (default none)
+//   FAKE_CLAUDE_PLUGIN_DIR  installPath reported for the conflicting plugin
+//   FAKE_CLAUDE_PONG        pong | auth-fail | wrong | no-init | no-roster  (default pong)
+//   FAKE_CLAUDE_COMMANDS    how many slash commands the init event lists (default 5)
+//   FAKE_CLAUDE_SKILLS      how many skills the init event lists (default 3)
+//   FAKE_CLAUDE_ROSTER_EXTRA  comma-separated extra roster entries, e.g. "demo:demo-skill"
+//   FAKE_CLAUDE_MODEL       the model the init event reports (default fake-model-1)
+//   FAKE_CLAUDE_QUERIES     JSON: { "<query>": "<mode>" | ["<mode>", ...] } — an array
+//                           is consumed one entry per run of that query
+//   FAKE_CLAUDE_DEFAULT     the mode for a query not in the map (default miss)
+//   FAKE_CLAUDE_STATE       directory for the per-query run counters
+//   FAKE_CLAUDE_LOG         file to append one JSON line per -p invocation to
+//
+// Query modes: trigger (Skill tool_use naming the stub, split across deltas), slash
+// (SlashCommand), read (Read of the stub file), assistant-only (no partial events,
+// only the full assistant message), miss (a text answer), other-tool (a Bash call),
+// toolsearch-then-trigger, hang, auth-error, api-error, crash, hide-stub (the init
+// event does not list the stub).
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+const env = process.env
+const argv = process.argv.slice(2)
+const out = (o) => process.stdout.write(JSON.stringify(o) + '\n')
+const log = (o) => env.FAKE_CLAUDE_LOG && appendFileSync(env.FAKE_CLAUDE_LOG, JSON.stringify({ argv, cwd: process.cwd(), claudecode: 'CLAUDECODE' in env, ...o }) + '\n')
+const hang = () => setInterval(() => {}, 1 << 30)
+
+if (argv.indexOf('-p') < 0) log({})
+
+if (argv[0] === '--version') {
+  if (env.FAKE_CLAUDE_VERSION === 'fail') process.exit(1)
+  console.log(env.FAKE_CLAUDE_VERSION ?? '2.1.268 (Claude Code)')
+  process.exit(0)
+}
+
+if (argv[0] === 'auth' && argv[1] === 'status') {
+  const inn = (env.FAKE_CLAUDE_AUTH ?? 'in') === 'in'
+  console.log(JSON.stringify(inn ? { loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty' } : { loggedIn: false, authMethod: 'none' }, null, 2))
+  process.exit(inn ? 0 : 1)
+}
+
+if (argv[0] === 'plugin' && argv[1] === 'list') {
+  const mode = env.FAKE_CLAUDE_PLUGINS ?? 'none'
+  const other = { id: 'other@market', version: '1.0.0', scope: 'user', enabled: true, installPath: join(env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent', '..', 'missing') }
+  const demo = { id: 'demo@market', version: '0.1.0', scope: 'user', enabled: mode !== 'disabled', installPath: env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent' }
+  const list = mode === 'none' ? [other] : [other, demo]
+  if (mode === 'text-conflict' || !argv.includes('--json')) {
+    console.log('Installed plugins:\n')
+    for (const p of list) console.log(`  ❯ ${p.id}\n    Version: ${p.version}\n    Scope: ${p.scope}\n    Status: ${p.enabled ? '✔ enabled' : '✘ disabled'}\n`)
+  } else console.log(JSON.stringify(list, null, 2))
+  process.exit(0)
+}
+
+const pi = argv.indexOf('-p')
+if (pi < 0) {
+  console.error(`fake claude: unscripted invocation: ${argv.join(' ')}`)
+  process.exit(64)
+}
+const prompt = argv[pi + 1]
+const model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : null
+const commandsDir = join(process.cwd(), '.claude', 'commands')
+const stubs = existsSync(commandsDir) ? readdirSync(commandsDir).filter((f) => f.endsWith('.md')) : []
+const stub = stubs[0]?.replace(/\.md$/, '') ?? null
+
+log({ prompt, model, stubs, stubText: stub ? readFileSync(join(commandsDir, stubs[0]), 'utf8') : null })
+
+const roster = (hideStub = false) => {
+  const commands = Array.from({ length: Number(env.FAKE_CLAUDE_COMMANDS ?? 5) }, (_, i) => `cmd-${i + 1}`)
+  const skills = Array.from({ length: Number(env.FAKE_CLAUDE_SKILLS ?? 3) }, (_, i) => `skill-${i + 1}`)
+  const extra = (env.FAKE_CLAUDE_ROSTER_EXTRA ?? '').split(',').filter(Boolean)
+  return { slash_commands: [...commands, ...extra, ...(stub && !hideStub ? [stub] : [])], skills: [...skills, ...extra] }
+}
+const init = (hideStub) => out({ type: 'system', subtype: 'init', cwd: process.cwd(), session_id: 'fake', model: model ?? env.FAKE_CLAUDE_MODEL ?? 'fake-model-1', tools: ['Bash', 'Read', 'Skill'], ...roster(hideStub) })
+const se = (event) => out({ type: 'stream_event', event })
+const text = (t, extra = {}) => out({ type: 'assistant', message: { model: 'fake-model-1', role: 'assistant', content: [{ type: 'text', text: t }] }, ...extra })
+const result = (t, isError = false) => out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: t })
+
+if (prompt === 'Reply with exactly: pong') {
+  const mode = env.FAKE_CLAUDE_PONG ?? 'pong'
+  if (mode !== 'no-init') {
+    if (mode === 'no-roster') out({ type: 'system', subtype: 'init', cwd: process.cwd(), model: 'fake-model-1' })
+    else init()
+  }
+  if (mode === 'auth-fail') {
+    text('Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"OAuth token has expired."}}', { error: 'authentication_failed' })
+    result('Failed to authenticate. API Error: 401', true)
+    process.exit(1)
+  }
+  const answer = mode === 'wrong' ? 'I am not sure what you mean.' : 'pong'
+  text(answer)
+  result(answer)
+  process.exit(0)
+}
+
+// --- a query run -------------------------------------------------------------
+
+let mode = env.FAKE_CLAUDE_DEFAULT ?? 'miss'
+const map = env.FAKE_CLAUDE_QUERIES ? JSON.parse(env.FAKE_CLAUDE_QUERIES) : {}
+if (prompt in map) {
+  const m = map[prompt]
+  if (Array.isArray(m)) {
+    let n = 0
+    if (env.FAKE_CLAUDE_STATE) {
+      mkdirSync(env.FAKE_CLAUDE_STATE, { recursive: true })
+      const f = join(env.FAKE_CLAUDE_STATE, Buffer.from(prompt).toString('hex').slice(0, 60))
+      n = existsSync(f) ? Number(readFileSync(f, 'utf8')) : 0
+      writeFileSync(f, String(n + 1))
+    }
+    mode = m[n % m.length]
+  } else mode = m
+}
+
+init(mode === 'hide-stub')
+se({ type: 'message_start', message: { model: 'fake-model-1', role: 'assistant', content: [] } })
+
+const toolUse = (name, input, chunks = 3) => {
+  se({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_1', name, input: {} } })
+  const json = JSON.stringify(input)
+  const size = Math.ceil(json.length / chunks)
+  for (let i = 0; i < json.length; i += size) se({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: json.slice(i, i + size) } })
+  se({ type: 'content_block_stop', index: 0 })
+}
+const textBlock = (t) => {
+  se({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+  se({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } })
+  se({ type: 'content_block_stop', index: 0 })
+}
+const stop = () => {
+  se({ type: 'message_delta', delta: { stop_reason: 'end_turn' } })
+  se({ type: 'message_stop' })
+}
+
+switch (mode) {
+  case 'trigger':
+  case 'hide-stub':
+    // After the trigger the fake hangs: a runner that does not stop at the first sign
+    // would sit here until its timeout and report one.
+    toolUse('Skill', { skill: stub })
+    hang()
+    break
+  case 'slash':
+    toolUse('SlashCommand', { command: `/${stub}` })
+    hang()
+    break
+  case 'read':
+    toolUse('Read', { file_path: join(commandsDir, `${stub}.md`) })
+    hang()
+    break
+  case 'toolsearch-then-trigger':
+    toolUse('ToolSearch', { query: 'select:Skill' })
+    stop()
+    out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'ok' }] } })
+    se({ type: 'message_start', message: { model: 'fake-model-1', role: 'assistant', content: [] } })
+    toolUse('Skill', { skill: stub })
+    hang()
+    break
+  case 'assistant-only':
+    out({ type: 'assistant', message: { model: 'fake-model-1', role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name: 'Skill', input: { skill: stub } }] } })
+    hang()
+    break
+  case 'other-skill':
+    toolUse('Skill', { skill: 'some-other-skill' })
+    stop()
+    hang()
+    break
+  case 'other-tool':
+    toolUse('Bash', { command: 'ls' })
+    stop()
+    hang()
+    break
+  case 'miss':
+    textBlock('Here is an answer that loads nothing.')
+    text('Here is an answer that loads nothing.')
+    stop()
+    result('Here is an answer that loads nothing.')
+    break
+  case 'hang':
+    hang()
+    break
+  case 'auth-error':
+    text('Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error"}}', { error: 'authentication_failed' })
+    result('Failed to authenticate. API Error: 401', true)
+    process.exitCode = 1
+    break
+  case 'api-error':
+    out({ type: 'assistant', message: { model: '<synthetic>', role: 'assistant', content: [{ type: 'text', text: 'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"model: not-a-model"}}' }] } })
+    result('API Error: 400', true)
+    process.exitCode = 1
+    break
+  case 'crash':
+    process.stderr.write('fake claude: crashed\n')
+    process.exit(2)
+    break
+  default:
+    console.error(`fake claude: unknown mode ${mode}`)
+    process.exit(65)
+}

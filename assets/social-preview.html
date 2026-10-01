@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>skilltrigger — social preview</title>
+<!--
+  The source of assets/social-preview.png, rendered by scripts/social.mjs with headless
+  Chrome. Open it in a browser to work on it: what you see at 1280×640 is the card.
+
+  The mark is assets/logo.svg itself, referenced by a relative path — not a copy — so
+  the card cannot drift from the favicon and the README. The colours are the site's dark
+  theme. The preflight on the right is the real output shape, gate names and all: the
+  gates are the product; the rate is what they let through.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; }
+  body {
+    background: #100f0e;
+    color: #ece8e1;
+    font: 400 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 88px;
+    position: relative;
+    overflow: hidden;
+  }
+  body::after {
+    content: "";
+    position: absolute;
+    right: -220px;
+    bottom: -280px;
+    width: 720px;
+    height: 720px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(155, 167, 255, 0.13), transparent 62%);
+  }
+  header { display: flex; align-items: center; gap: 22px; margin-bottom: 34px; }
+  header img { width: 76px; height: 76px; border-radius: 17px; }
+  h1 { font-size: 62px; letter-spacing: -0.035em; font-weight: 650; line-height: 1; }
+  h1 span { color: #9ba7ff; }
+  p.lede { font-size: 27px; line-height: 1.35; color: #9b948a; max-width: 560px; }
+  p.lede strong { color: #ece8e1; font-weight: 600; }
+  .gates {
+    position: absolute;
+    right: 88px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 470px;
+    background: #171614;
+    border: 1px solid #2c2925;
+    border-radius: 14px;
+    padding: 22px 24px;
+    font: 400 15px/1.85 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color: #6b665e;
+  }
+  .gates b { color: #ece8e1; font-weight: 400; }
+  .gates .ok { color: #9ba7ff; }
+  .gates .fail { color: #e8846b; }
+  .gates .result { display: block; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #2c2925; color: #ece8e1; }
+  footer {
+    position: absolute;
+    left: 88px;
+    bottom: 54px;
+    font: 500 15px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.02em;
+    color: #6b665e;
+  }
+  footer span { color: #9ba7ff; }
+</style>
+</head>
+<body>
+  <header>
+    <img src="logo.svg" alt="">
+    <h1>skill<span>trigger</span></h1>
+  </header>
+  <p class="lede">Skill trigger rates<br><strong>you can trust</strong>.</p>
+
+  <div class="gates">
+    <b>$ skilltrigger preflight</b><br>
+    <span class="ok">ok</span>&nbsp;&nbsp;&nbsp;cli&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on PATH, version recorded<br>
+    <span class="ok">ok</span>&nbsp;&nbsp;&nbsp;auth&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logged in<br>
+    <span class="ok">ok</span>&nbsp;&nbsp;&nbsp;round-trip answered pong<br>
+    <span class="fail">fail</span> conflict&nbsp;&nbsp;&nbsp;a plugin shadows the stub<br>
+    <span class="ok">ok</span>&nbsp;&nbsp;&nbsp;sleep&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;caffeinate holds it awake<br>
+    <span class="ok">ok</span>&nbsp;&nbsp;&nbsp;roster&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;83 slash commands
+    <span class="result">refusing to run: a failed gate makes<br>the number meaningless</span>
+  </div>
+
+  <footer>Claude Code <span>·</span> serial <span>·</span> no number through a failed gate</footer>
+</body>
+</html>
