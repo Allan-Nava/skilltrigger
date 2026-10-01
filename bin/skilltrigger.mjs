@@ -2,7 +2,7 @@
 // skilltrigger — how often a Claude Code skill's description makes the model load it,
 // measured behind gates that refuse to report a number they cannot trust.
 //
-//   skilltrigger preflight [--model M] [--skill <dir>] [--allow-conflict]
+//   skilltrigger preflight [--model M] [--skill <dir>] [--out <dir>] [--allow-conflict]
 //   skilltrigger run --skill <dir> --eval <file> [--runs 2] [--model M] [--timeout 30]
 //                    [--description "<override>"] [--out <dir>] [--allow-conflict]
 //   skilltrigger compare <a.json> <b.json>
@@ -16,9 +16,10 @@ import { UsageError, number, parseArgs } from './lib/args.mjs'
 import { checkRepo } from './lib/check.mjs'
 import { compare } from './lib/compare.mjs'
 import { formatGates, preflight } from './lib/gates.mjs'
-import { NO_VERDICT_SHARE, headline, partialLine, summarise, writeReport } from './lib/report.mjs'
+import { NO_VERDICT_SHARE, headline, localDate, partialLine, summarise, writeReport } from './lib/report.mjs'
 import { runAll } from './lib/runner.mjs'
 import { loadEvalSet, loadSkill } from './lib/skill.mjs'
+import { formatReminders, readToggles, reconcile, writeToggles } from './lib/toggles.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
@@ -29,18 +30,27 @@ const HELP = readFileSync(fileURLToPath(import.meta.url), 'utf8')
   .map((l) => l.replace(/^\/\/ ?/, ''))
   .join('\n')
 
-async function gates({ model, skillName, allowConflict }) {
+const DEFAULT_OUT = 'skilltrigger-results'
+
+// The gates, then the re-enable reminder: the toggles the conflict gate printed are kept
+// under --out, and any of those plugins still disabled is named with its enable command.
+async function gates({ model, skillName, allowConflict, outDir }) {
   console.log(`skilltrigger ${pkg.version} — preflight`)
   const pf = await preflight({ model, skillName, allowConflict })
   console.log(formatGates(pf.gates))
-  return pf
+  const conflict = pf.gates.find((x) => x.id === 'conflict')
+  const { keep, reminders } = reconcile({ remembered: readToggles(outDir), conflicts: conflict?.conflicts ?? [], plugins: conflict?.plugins ?? null, date: localDate() })
+  writeToggles(outDir, keep)
+  const note = formatReminders(reminders)
+  if (note) console.log(`\n${note}`)
+  return { ...pf, reminders }
 }
 
 async function cmdPreflight(argv) {
-  const { opts, positional } = parseArgs(argv, { model: 'string', skill: 'string', 'allow-conflict': 'boolean' })
+  const { opts, positional } = parseArgs(argv, { model: 'string', skill: 'string', out: 'string', 'allow-conflict': 'boolean' })
   if (positional.length) throw new UsageError(`unexpected argument: ${positional[0]}`)
   const skillName = opts.skill ? loadSkill(opts.skill).name : null
-  const pf = await gates({ model: opts.model ?? null, skillName, allowConflict: Boolean(opts['allow-conflict']) })
+  const pf = await gates({ model: opts.model ?? null, skillName, allowConflict: Boolean(opts['allow-conflict']), outDir: resolve(opts.out ?? DEFAULT_OUT) })
   if (!pf.ok) {
     console.log('\npreflight failed — a run now would measure the failure, not the description')
     return 2
@@ -70,10 +80,10 @@ async function cmdRun(argv) {
   const overridden = opts.description !== undefined
   const description = overridden ? opts.description : skill.description
   if (!description.trim()) throw new UsageError('--description is empty')
-  const outDir = resolve(opts.out ?? 'skilltrigger-results')
+  const outDir = resolve(opts.out ?? DEFAULT_OUT)
   const model = opts.model ?? null
 
-  const pf = await gates({ model, skillName: skill.name, allowConflict: Boolean(opts['allow-conflict']) })
+  const pf = await gates({ model, skillName: skill.name, allowConflict: Boolean(opts['allow-conflict']), outDir })
   if (!pf.ok) {
     console.log('\nrefusing to run: a failed gate makes the number meaningless. Fix it and run again.')
     return 2
@@ -119,6 +129,8 @@ async function cmdRun(argv) {
   if (partialLine(rep)) console.log(partialLine(rep))
   if (rep.verdict === 'ok') console.log(`per query: ${rep.totals.passed}/${rep.totals.queries} pass at a trigger rate threshold of ${rep.triggerThreshold}; no-verdict threshold ${rep.noVerdictThreshold * 100}% of runs`)
   console.log(`report: ${files.json}\n        ${files.md}`)
+  const after = formatReminders(pf.reminders, { after: true })
+  if (after) console.log(`\n${after}`)
   return rep.verdict === 'ok' ? 0 : 3
 }
 

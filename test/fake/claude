@@ -12,6 +12,8 @@
 //                           shape the parser reads; no-json-flag rejects --json (exit 1)
 //                           and answers the human form without it
 //   FAKE_CLAUDE_PLUGIN_DIR  installPath reported for the conflicting plugin
+//   FAKE_CLAUDE_PLUGIN_STATE  enabled — overrides what the mode says about demo@market,
+//                           so "re-enabled after the measurement" can be scripted
 //   FAKE_CLAUDE_PONG        pong | auth-fail | wrong | no-init | no-roster  (default pong)
 //   FAKE_CLAUDE_COMMANDS    how many slash commands the init event lists (default 5)
 //   FAKE_CLAUDE_SKILLS      how many skills the init event lists (default 3)
@@ -57,7 +59,7 @@ if (argv[0] === 'auth' && argv[1] === 'status') {
 if (argv[0] === 'plugin' && argv[1] === 'list') {
   const mode = env.FAKE_CLAUDE_PLUGINS ?? 'none'
   const other = { id: 'other@market', version: '1.0.0', scope: 'user', enabled: true, installPath: join(env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent', '..', 'missing') }
-  const demo = { id: 'demo@market', version: '0.1.0', scope: 'user', enabled: mode !== 'disabled', installPath: env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent' }
+  const demo = { id: 'demo@market', version: '0.1.0', scope: 'user', enabled: env.FAKE_CLAUDE_PLUGIN_STATE === 'enabled' || mode !== 'disabled', installPath: env.FAKE_CLAUDE_PLUGIN_DIR ?? '/nonexistent' }
   const list = mode === 'none' ? [other] : mode === 'empty' ? [] : [other, demo]
   const json = argv.includes('--json')
   if (mode === 'garbage') {

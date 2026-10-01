@@ -12,6 +12,12 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
   environment contributed — memory files for the temporary project and for the user,
   hooks configured, MCP servers in the `init` event — never their contents, paths or
   names (ST-20).
+- A re-enable reminder. The toggles the conflict gate prints are remembered in
+  `.skilltrigger-toggles` under the `--out` directory, never under `~/.claude`; every
+  `preflight` that sees such a plugin still disabled, and the end of every `run`, prints
+  its `claude plugin enable …` command, until a preflight sees it enabled again or
+  uninstalled. `preflight` takes `--out` for it, defaulting to `./skilltrigger-results`
+  as `run` does. Nothing is enabled or disabled by skilltrigger itself (ST-21).
 
 ### Changed
 - `compare` warns when roster members differ, listing the names added and removed, not

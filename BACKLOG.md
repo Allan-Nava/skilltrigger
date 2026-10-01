@@ -120,10 +120,13 @@ version, the model and the roster size.
   `environment` counted by `bin/lib/environment.mjs`; `compare` lists the members added
   and removed, and warns on run models and environment counts. The `mcp_servers` field is
   unverified on a live CLI (ST-12). <!-- st: prio=med size=M labels=report ver=main -->
-- [ ] **ST-21 — Nothing reminds the user to re-enable a plugin**: once a conflicting plugin is
+- [x] **ST-21 — Nothing reminds the user to re-enable a plugin**: once a conflicting plugin is
   disabled it is no longer a conflict, so neither `preflight` nor `run` mentions it again.
   Remember the toggle the gate printed and print the re-enable command at the end of a run.
-  <!-- st: prio=med size=S labels=gates -->
+  Done 2026-10-01: `bin/lib/toggles.mjs` keeps the gate's toggles in
+  `<out>/.skilltrigger-toggles`; `preflight` (now with `--out`) and the end of `run` print
+  the enable command while the plugin stays disabled, and forget it once it is enabled or
+  uninstalled. <!-- st: prio=med size=S labels=gates ver=main -->
 
 ## v0.2.0 — Same day, same roster <!-- ms: phase=next -->
 

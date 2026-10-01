@@ -97,8 +97,8 @@ export function findConflicts({ plugins, skillName, roster = [] }) {
   return [...found.values()]
 }
 
-// The commands are printed, never run: disabling a plugin is the user's decision, and
-// re-enabling it afterwards is theirs to remember.
+// The commands are printed, never run: disabling a plugin is the user's decision, and so
+// is re-enabling it — bin/lib/toggles.mjs only reminds them of it (ST-21).
 export function toggleCommands(conflicts) {
   const withScope = (verb, c) => `claude plugin ${verb} ${c.id}${c.scope ? ` --scope ${c.scope}` : ''}`
   const plugins = conflicts.filter((c) => c.id)

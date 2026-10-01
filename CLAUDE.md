@@ -22,6 +22,7 @@ bin/
   lib/gates.mjs        the six gates and their formatting
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
   lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
+  lib/toggles.mjs      the re-enable reminder: the gate's toggles, kept under --out
   lib/stream.mjs       the detector: one run's events → an outcome
   lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run
   lib/report.mjs       summary, verdict rule, JSON + Markdown
@@ -61,7 +62,9 @@ Do not weaken these; they are the tool's whole reason to exist.
    are removed; every `claude -p` gets `--no-session-persistence`. Plugin install
    directories are read, never written.
 6. **Fixes are printed, never run.** The conflict gate prints `claude plugin disable`
-   and `enable`; it does not call them.
+   and `enable`; it does not call them. It remembers them in `<out>/.skilltrigger-toggles`
+   — never under `~/.claude` — and prints the enable command while the plugin stays
+   disabled (ST-21).
 7. **The report carries queries, counts and versions only** — plus the roster's member
    names and the model each run reported (ST-20); no description text, no paths, no stub
    names, no stderr. The inherited environment is counted, never quoted.
