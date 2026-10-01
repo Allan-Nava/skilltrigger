@@ -24,4 +24,4 @@ jobs:
   # tag (ST-22): the tag is skilltrigger--v<version>, and a CHANGELOG heading that says
   # "not released" passes with a notice.
   drift:
-    uses: Allan-Nava/backlogsync/.github/workflows/release-drift.yml@974f2bd96a7030af8f30eab093b05b7b46482ede
+    uses: Allan-Nava/backlogsync/.github/workflows/release-drift.yml@backlogsync--v0.1.0

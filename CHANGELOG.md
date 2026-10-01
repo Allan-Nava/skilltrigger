@@ -5,6 +5,12 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Changed
+- backlogsync is pinned to its 0.1.0 release instead of a commit: the CI `backlog` job,
+  `backlog-issues.yml` and `release-drift.yml` at `@backlogsync--v0.1.0`, `npm run backlog`
+  and `npm run roadmap` on `npx backlogsync@0.1.0`; `repository.url` takes the form npm
+  normalises it to, so `npm publish` no longer rewrites it (ST-23).
+
 ## [0.0.2] — 2026-10-01
 
 Tested only against the fake `claude` the tests use, never against a live CLI — the
