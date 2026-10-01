@@ -49,9 +49,8 @@ jobs:
       - run: npm pack --dry-run
 
   # BACKLOG.md is the single source of truth; ROADMAP.md is generated from it and the
-  # issues are synced from it. A stale roadmap fails here; the planner's decisions are
-  # asserted against a fixture, because a wrong decision opens duplicates or closes
-  # open work on a public repository.
+  # issues are synced from it, both by backlogsync (pinned by commit). A malformed item
+  # or a stale roadmap fails here; the planner's own tests live in backlogsync (ST-22).
   backlog:
     runs-on: ubuntu-latest
     steps:
@@ -59,6 +58,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - run: node scripts/backlog.mjs lint
-      - run: node scripts/backlog.mjs check
-      - run: node scripts/backlog_test.mjs
+      - uses: Allan-Nava/backlogsync@974f2bd96a7030af8f30eab093b05b7b46482ede
+        with:
+          command: check

@@ -21,6 +21,10 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
   as `run` does. Nothing is enabled or disabled by skilltrigger itself (ST-21).
 
 ### Changed
+- The backlog check, the roadmap, the issue sync and the release-drift check are
+  [backlogsync](https://github.com/Allan-Nava/backlogsync), pinned by commit;
+  `scripts/backlog.mjs` and its test are gone, and `npm run roadmap` regenerates
+  `ROADMAP.md` (ST-22).
 - `compare` warns when roster members differ, counting the members added and removed by hash, not
   only when the counts differ; and when the models the runs reported or the inherited
   environment's counts differ. Reports without the new fields compare as before (ST-20).

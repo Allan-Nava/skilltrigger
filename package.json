@@ -17,8 +17,52 @@
   },
   "scripts": {
     "test": "node bin/skilltrigger.mjs check && node --test",
-    "backlog": "node scripts/backlog.mjs lint && node scripts/backlog.mjs check",
-    "build:site": "node site/build.mjs"
+    "backlog": "npx --yes https://codeload.github.com/Allan-Nava/backlogsync/tar.gz/974f2bd96a7030af8f30eab093b05b7b46482ede check",
+    "build:site": "node site/build.mjs",
+    "roadmap": "npx --yes https://codeload.github.com/Allan-Nava/backlogsync/tar.gz/974f2bd96a7030af8f30eab093b05b7b46482ede roadmap"
+  },
+  "backlogsync": {
+    "prefix": "ST",
+    "name": "skilltrigger",
+    "regenerate": "npm run roadmap",
+    "labels": {
+      "gates": [
+        "3b4bb8",
+        "Preflight gates: CLI, auth, round trip, conflict, sleep, roster"
+      ],
+      "runner": [
+        "0e8a16",
+        "The serial runner and the stream detector"
+      ],
+      "report": [
+        "fbca04",
+        "Reports, verdict rule, compare"
+      ],
+      "release": [
+        "5319e7",
+        "Publishing and versioning"
+      ],
+      "docs": [
+        "0075ca",
+        "README, CONTRIBUTING, site"
+      ],
+      "project": [
+        "6a737d",
+        "Backlog, roadmap, repo hygiene"
+      ],
+      "tests": [
+        "d4c5f9",
+        "Test coverage and the fake claude"
+      ],
+      "enhancement": [
+        "a2eeef",
+        "New capability"
+      ],
+      "prio-med": [
+        "e4b429",
+        "Medium priority in BACKLOG.md"
+      ]
+    }
   },
   "repository": {
     "type": "git",
