@@ -15,6 +15,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execClaude, streamClaude } from './claude.mjs'
+import { configDirOf, environmentSummary, memoryFiles } from './environment.mjs'
 import { findConflicts, parsePluginList, toggleCommands } from './plugins.mjs'
 
 export const PONG_PROMPT = 'Reply with exactly: pong'
@@ -74,7 +75,10 @@ async function roundTrip({ env, model }) {
       gate = g('round-trip', 'fail', `claude -p answered an error: ${firstLine(answer)}`, /authenticat|oauth|api key|401/i.test(answer) ? 'log in again: `claude auth login` — auth status can say logged in while the token is expired' : 'update the CLI (`claude update`) or pass a --model this CLI knows')
     } else if (!/^\W*pong\W*$/i.test(answer)) gate = g('round-trip', 'fail', `claude -p answered "${firstLine(answer || r.stderr) || '(nothing)'}", not pong (exit ${r.code})`, 'run `claude -p "Reply with exactly: pong"` by hand and fix what it prints')
     else gate = g('round-trip', 'ok', `claude -p answered pong${model ? ` (model ${model})` : ''}`)
-    return { gate, init }
+    // The memory files are counted from this directory, before it is removed: the runs'
+    // projects are made the same way, beside it, so they share its ancestors.
+    const memory = memoryFiles({ projectDir: dir, configDir: configDirOf(env) })
+    return { gate, init, memory }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -83,7 +87,11 @@ async function roundTrip({ env, model }) {
 function rosterGate(init) {
   if (!init) return g('roster', 'fail', 'no init event in the stream — the roster cannot be recorded', 'update the CLI: `claude update`; the init event of `claude -p --output-format stream-json --verbose` lists the roster')
   if (!Array.isArray(init.slash_commands)) return g('roster', 'fail', 'the init event lists no slash_commands — the roster cannot be recorded', 'update the CLI: `claude update`')
-  const roster = { slashCommands: init.slash_commands.length, skills: Array.isArray(init.skills) ? init.skills.length : null }
+  // Names, sorted, beside the counts: two rosters of one size can differ in members
+  // (ST-20). The preflight project holds no stub, so no stub name can be among them.
+  const names = (list) => [...new Set(list.map((s) => (typeof s === 'string' ? s : s?.name)).filter(Boolean))].sort()
+  const skillList = Array.isArray(init.skills) ? init.skills : null
+  const roster = { slashCommands: init.slash_commands.length, skills: skillList ? skillList.length : null, commandNames: names(init.slash_commands), skillNames: skillList ? names(skillList) : null }
   const skills = roster.skills === null ? '' : `, ${roster.skills} skills`
   return { ...g('roster', 'ok', `${roster.slashCommands} slash commands${skills} visible to the model`), roster, model: init.model ?? null, entries: [...init.slash_commands, ...(Array.isArray(init.skills) ? init.skills.map((s) => (typeof s === 'string' ? s : s?.name)) : [])].filter(Boolean) }
 }
@@ -107,9 +115,9 @@ async function conflictGate({ env, skillName, allowConflict, rosterEntries }) {
     return { ...g('conflict', allowConflict ? 'warn' : 'fail', allowConflict ? `${detail} (allowed by --allow-conflict, recorded in the report)` : detail, fix.join('\n')), unreadable: true }
   }
   const enabled = plugins.filter((p) => p.enabled)
-  if (!skillName) return g('conflict', 'warn', `no --skill given, so nothing to compare against ${enabled.length} enabled plugin(s)${enabled.length ? `: ${enabled.map((p) => p.id).join(', ')}` : ''}`, 'pass --skill <dir> to check this gate')
+  if (!skillName) return { ...g('conflict', 'warn', `no --skill given, so nothing to compare against ${enabled.length} enabled plugin(s)${enabled.length ? `: ${enabled.map((p) => p.id).join(', ')}` : ''}`, 'pass --skill <dir> to check this gate'), plugins }
   const conflicts = findConflicts({ plugins, skillName, roster: rosterEntries })
-  if (!conflicts.length) return g('conflict', 'ok', `no enabled plugin or visible skill named ${skillName} (${enabled.length} enabled plugin(s) checked)`)
+  if (!conflicts.length) return { ...g('conflict', 'ok', `no enabled plugin or visible skill named ${skillName} (${enabled.length} enabled plugin(s) checked)`), plugins }
   const { disable, enable } = toggleCommands(conflicts)
   const unaccounted = conflicts.filter((c) => !c.id).map((c) => c.via)
   const lines = [
@@ -118,7 +126,7 @@ async function conflictGate({ env, skillName, allowConflict, rosterEntries }) {
     'skilltrigger runs none of these itself; --allow-conflict measures anyway and records that it did',
   ]
   const detail = `${conflicts.map((c) => c.via).join('; ')} — the model would load it, not the stub`
-  return { ...g('conflict', allowConflict ? 'warn' : 'fail', allowConflict ? `${detail} (allowed by --allow-conflict, recorded in the report)` : detail, lines.join('\n')), conflicts }
+  return { ...g('conflict', allowConflict ? 'warn' : 'fail', allowConflict ? `${detail} (allowed by --allow-conflict, recorded in the report)` : detail, lines.join('\n')), conflicts, plugins }
 }
 
 // macOS: `caffeinate -i -s -w <pid>` holds off idle and system sleep for as long as
@@ -137,19 +145,19 @@ export function sleepGate({ platform = process.platform, caffeinate = '/usr/bin/
   })
 }
 
-// → { gates, ok, facts: { cliVersion, model, roster, conflictAllowed } }
+// → { gates, ok, facts: { cliVersion, model, roster, conflictAllowed, environment } }
 export async function preflight({ env = process.env, model = null, skillName = null, allowConflict = false, platform = process.platform } = {}) {
   const gates = []
   const cli = await cliGate(env)
   gates.push(cli)
-  const facts = { cliVersion: cli.version ?? null, model, roster: null, conflictAllowed: false }
+  const facts = { cliVersion: cli.version ?? null, model, roster: null, conflictAllowed: false, environment: null }
   if (cli.status !== 'ok') {
     for (const id of ['auth', 'round-trip', 'conflict']) gates.push(g(id, 'skip', 'not run: the cli gate failed'))
     gates.push(await sleepGate({ platform }))
     gates.push(g('roster', 'skip', 'not run: the cli gate failed'))
   } else {
     gates.push(await authGate(env))
-    const { gate, init } = await roundTrip({ env, model })
+    const { gate, init, memory } = await roundTrip({ env, model })
     gates.push(gate)
     const roster = rosterGate(init)
     const conflict = await conflictGate({ env, skillName, allowConflict, rosterEntries: roster.entries ?? [] })
@@ -159,6 +167,7 @@ export async function preflight({ env = process.env, model = null, skillName = n
     facts.roster = roster.roster ?? null
     facts.model = model ?? roster.model ?? null
     facts.conflictAllowed = conflict.status === 'warn' && Boolean(conflict.conflicts?.length || conflict.unreadable)
+    facts.environment = environmentSummary({ env, memory, plugins: conflict.plugins ?? [], init })
   }
   return { gates, ok: !gates.some((x) => x.status === 'fail'), facts }
 }

@@ -55,6 +55,34 @@ test('a different model, CLI or roster is a warning: the number belongs to the r
   assert.match(c.warnings.join('\n'), /roster.*59.*83/)
 })
 
+// ST-20: counts alone call two different rosters of one size the same environment.
+const named = (commandNames, skillNames) => ({ slashCommands: commandNames.length, skills: skillNames.length, commandNames, skillNames })
+
+test('rosters of the same size with different members are a warning naming what moved', () => {
+  const ra = named(['alpha', 'beta', 'gamma'], ['s-one', 's-two'])
+  const rb = named(['alpha', 'beta', 'delta'], ['s-one', 's-three'])
+  const c = compare({ ...A, roster: ra }, { ...B, roster: rb })
+  const w = c.warnings.find((x) => /roster members differ/.test(x))
+  assert.ok(w, c.warnings.join('\n'))
+  assert.match(w, /slash commands: added delta; removed gamma/)
+  assert.match(w, /skills: added s-three; removed s-two/)
+  assert.ok(!c.warnings.some((x) => /roster differs: /.test(x)), 'the counts agree, so no count warning')
+})
+
+test('identical members are no warning; a report without names compares by counts alone', () => {
+  const r = named(['alpha', 'beta'], ['s-one'])
+  assert.deepEqual(compare({ ...A, roster: r }, { ...B, roster: { ...r } }).warnings, [])
+  assert.deepEqual(compare({ ...A, roster: { slashCommands: 2, skills: 1 } }, { ...B, roster: r }).warnings, [])
+})
+
+test('the models the runs reported and the inherited environment are compared too', () => {
+  const env = { memoryFiles: { project: 0, user: 1 }, hooks: 2, mcpServers: 0 }
+  const c = compare({ ...A, runModels: { 'm-1': 8 }, environment: env }, { ...B, runModels: { 'm-2': 8 }, environment: { ...env, hooks: 3, mcpServers: 1 } })
+  assert.match(c.warnings.join('\n'), /models the runs reported differ: m-1 vs m-2/)
+  assert.match(c.warnings.join('\n'), /inherited environment differs: .*hooks 2 vs 3.*MCP servers 0 vs 1/)
+  assert.deepEqual(compare({ ...A, runModels: { 'm-1': 8 }, environment: env }, { ...B, runModels: { 'm-1': 6 }, environment: { ...env } }).warnings, [])
+})
+
 test('a report without a verdict is flagged, not compared as if it had one', () => {
   const c = compare(A, { ...B, verdict: 'no-verdict' })
   assert.match(c.warnings.join('\n'), /no verdict/)

@@ -17,6 +17,9 @@
 //   FAKE_CLAUDE_SKILLS      how many skills the init event lists (default 3)
 //   FAKE_CLAUDE_ROSTER_EXTRA  comma-separated extra roster entries, e.g. "demo:demo-skill"
 //   FAKE_CLAUDE_MODEL       the model the init event reports (default fake-model-1)
+//   FAKE_CLAUDE_RUN_MODEL   the model a query run's init event reports instead, so the
+//                           per-run model can differ from the preflight's
+//   FAKE_CLAUDE_MCP         how many MCP servers the init event lists (default 0)
 //   FAKE_CLAUDE_QUERIES     JSON: { "<query>": "<mode>" | ["<mode>", ...] } — an array
 //                           is consumed one entry per run of that query
 //   FAKE_CLAUDE_DEFAULT     the mode for a query not in the map (default miss)
@@ -99,7 +102,10 @@ const roster = (hideStub = false) => {
   const extra = (env.FAKE_CLAUDE_ROSTER_EXTRA ?? '').split(',').filter(Boolean)
   return { slash_commands: [...commands, ...extra, ...(stub && !hideStub ? [stub] : [])], skills: [...skills, ...extra] }
 }
-const init = (hideStub) => out({ type: 'system', subtype: 'init', cwd: process.cwd(), session_id: 'fake', model: model ?? env.FAKE_CLAUDE_MODEL ?? 'fake-model-1', tools: ['Bash', 'Read', 'Skill'], ...roster(hideStub) })
+const isPong = prompt === 'Reply with exactly: pong'
+const mcp = Array.from({ length: Number(env.FAKE_CLAUDE_MCP ?? 0) }, (_, i) => ({ name: `mcp-${i + 1}`, status: 'connected' }))
+const initModel = () => model ?? (!isPong && env.FAKE_CLAUDE_RUN_MODEL ? env.FAKE_CLAUDE_RUN_MODEL : env.FAKE_CLAUDE_MODEL ?? 'fake-model-1')
+const init = (hideStub) => out({ type: 'system', subtype: 'init', cwd: process.cwd(), session_id: 'fake', model: initModel(), tools: ['Bash', 'Read', 'Skill'], mcp_servers: mcp, ...roster(hideStub) })
 const se = (event) => out({ type: 'stream_event', event })
 const text = (t, extra = {}) => out({ type: 'assistant', message: { model: 'fake-model-1', role: 'assistant', content: [{ type: 'text', text: t }] }, ...extra })
 const result = (t, isError = false) => out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: t })

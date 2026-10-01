@@ -5,6 +5,19 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Added
+- The report records what `compare` needs to tell two environments apart: the roster's
+  members (names only, sorted) beside its counts; the model each run's `init` event
+  reported, per run and counted in `runModels`; and a count of what the inherited
+  environment contributed — memory files for the temporary project and for the user,
+  hooks configured, MCP servers in the `init` event — never their contents, paths or
+  names (ST-20).
+
+### Changed
+- `compare` warns when roster members differ, listing the names added and removed, not
+  only when the counts differ; and when the models the runs reported or the inherited
+  environment's counts differ. Reports without the new fields compare as before (ST-20).
+
 ### Fixed
 - A verdict no longer survives losing whole queries. The 10% rule counts runs, so two
   positive queries could lose every run to timeouts or errors and the report still gave

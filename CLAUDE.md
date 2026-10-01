@@ -21,6 +21,7 @@ bin/
   lib/claude.mjs       spawning claude: env minus CLAUDECODE, process-group kill
   lib/gates.mjs        the six gates and their formatting
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
+  lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
   lib/stream.mjs       the detector: one run's events → an outcome
   lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run
   lib/report.mjs       summary, verdict rule, JSON + Markdown
@@ -61,8 +62,9 @@ Do not weaken these; they are the tool's whole reason to exist.
    directories are read, never written.
 6. **Fixes are printed, never run.** The conflict gate prints `claude plugin disable`
    and `enable`; it does not call them.
-7. **The report carries queries, counts and versions only** — no description text, no
-   paths, no stub names, no stderr.
+7. **The report carries queries, counts and versions only** — plus the roster's member
+   names and the model each run reported (ST-20); no description text, no paths, no stub
+   names, no stderr. The inherited environment is counted, never quoted.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 
@@ -74,7 +76,8 @@ run** — that is ST-12.
   `claude plugin disable|enable <id> --scope <scope>` exist.
 - `claude auth status` prints JSON by default with `loggedIn`.
 - `--no-session-persistence` and `--include-partial-messages` exist and work with `-p`.
-- The `init` event carries `slash_commands` (and `skills`, `model`); project commands
+- The `init` event carries `slash_commands` (and `skills`, `model`, `mcp_servers` — the last
+  unverified, read as a count and `null` when absent); project commands
   appear there by bare name. If the stub never appears, every run is an `error` — loud,
   not wrong.
 - Partial events: `stream_event` wrapping `content_block_start` (tool_use with `name`),

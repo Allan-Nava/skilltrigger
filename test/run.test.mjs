@@ -1,7 +1,7 @@
 // `skilltrigger run` end to end against the fake claude: the outcomes, the verdict
 // rule, the report, and what the runner leaves behind (nothing).
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { EVALS, SKILL, cli, fakeEnv, readLog, scratch } from './helpers.mjs'
@@ -9,10 +9,11 @@ import { EVALS, SKILL, cli, fakeEnv, readLog, scratch } from './helpers.mjs'
 const POS = ['show me a demo of the thing', 'run the demo for the new feature']
 const NEG = ['what is the capital of France', 'write a haiku about tea']
 
-async function run(env = {}, args = [], { evals = EVALS } = {}) {
+async function run(env = {}, args = [], { evals = EVALS, setup = () => {} } = {}) {
   const s = scratch()
   const out = join(s.dir, 'out')
   try {
+    setup(s.dir)
     const r = await cli(['run', '--skill', SKILL, '--eval', evals, '--out', out, '--timeout', '5', ...args], fakeEnv(s.dir, env))
     const files = existsSync(out) ? readdirSync(out) : []
     const jsonFile = files.find((f) => f.endsWith('.json'))
@@ -220,7 +221,8 @@ test('the report: date, versions, roster, settings, every outcome — and nothin
   assert.equal(rep.skill, 'demo-skill')
   assert.equal(rep.cliVersion, '2.1.268 (Claude Code)')
   assert.equal(rep.model, 'fake-model-1')
-  assert.deepEqual(rep.roster, { slashCommands: 83, skills: 3 })
+  assert.equal(rep.roster.slashCommands, 83)
+  assert.equal(rep.roster.skills, 3)
   assert.equal(rep.runsPerQuery, 2)
   assert.equal(rep.timeoutSeconds, 5)
   assert.equal(rep.triggerThreshold, 0.5)
@@ -236,6 +238,38 @@ test('the report: date, versions, roster, settings, every outcome — and nothin
   assert.ok(!r.reportText.includes('fixtures'), 'no eval path')
   assert.match(r.md, /\| show me a demo of the thing \| yes \| 2\/2 \|/)
   assert.match(r.md, /83 slash commands/)
+})
+
+// ST-20: the report records what compare needs to tell two environments apart — the
+// roster's members, the model each run reported, and what the inherited environment
+// contributed, counted — and still no description text, path or stub name.
+test('the report: roster members, per-run model, the environment counted — still no text, path or stub', async () => {
+  const SECRET = 'private memory text that must not leak'
+  const setup = (dir) => {
+    const config = join(dir, 'home', '.claude')
+    mkdirSync(join(config, 'rules'), { recursive: true })
+    writeFileSync(join(config, 'CLAUDE.md'), SECRET)
+    writeFileSync(join(config, 'rules', 'one.md'), SECRET)
+    writeFileSync(join(config, 'settings.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `echo ${SECRET}` }, { type: 'command', command: 'true' }] }] } }))
+  }
+  const r = await run({ ...healthy, FAKE_CLAUDE_COMMANDS: '3', FAKE_CLAUDE_SKILLS: '2', FAKE_CLAUDE_ROSTER_EXTRA: 'zeta-cmd', FAKE_CLAUDE_MCP: '2', FAKE_CLAUDE_RUN_MODEL: 'fake-model-2' }, [], { setup })
+  assert.equal(r.code, 0, r.out)
+  const rep = r.report
+  assert.deepEqual(rep.roster, { slashCommands: 4, skills: 3, commandNames: ['cmd-1', 'cmd-2', 'cmd-3', 'zeta-cmd'], skillNames: ['skill-1', 'skill-2', 'zeta-cmd'] })
+  assert.equal(rep.model, 'fake-model-1', 'the preflight model, as before')
+  assert.deepEqual(rep.runModels, { 'fake-model-2': 8 })
+  assert.deepEqual(rep.queries[0].models, ['fake-model-2', 'fake-model-2'])
+  assert.equal(rep.environment.memoryFiles.user, 2)
+  assert.equal(typeof rep.environment.memoryFiles.project, 'number')
+  assert.equal(rep.environment.hooks, 2)
+  assert.equal(rep.environment.mcpServers, 2)
+  assert.match(r.md, /fake-model-2/)
+  assert.match(r.md, /2 user memory file/)
+  assert.match(r.md, /zeta-cmd/)
+  for (const leak of [SECRET, 'Demonstrates a skill', SKILL, 'stub-', 'fixtures', 'home', 'CLAUDE.md', 'settings.json', 'skilltrigger-run-', 'skilltrigger-preflight-']) {
+    assert.ok(!r.reportText.includes(leak), `the report carries ${leak}`)
+    assert.ok(!r.md.includes(leak), `the Markdown carries ${leak}`)
+  }
 })
 
 test('a second report on the same day does not overwrite the first', async () => {

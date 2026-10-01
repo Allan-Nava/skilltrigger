@@ -103,6 +103,7 @@ async function cmdRun(argv) {
   const rep = summarise({
     items,
     outcomes: res.outcomes,
+    models: res.models,
     skillName: skill.name,
     description,
     overridden,

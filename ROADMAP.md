@@ -4,13 +4,13 @@
 
 > This page is **generated** from [BACKLOG.md](BACKLOG.md), the single source of truth for planned work. Regenerate it with `node scripts/backlog.mjs roadmap` after editing the backlog — CI fails when the two disagree.
 
-**21 items · 12 shipped · 9 open · 2 milestones.**
+**21 items · 13 shipped · 8 open · 2 milestones.**
 
 ## At a glance
 
 | Milestone | Phase | Progress | Open | Shipped |
 |---|---|---|---|---|
-| **v0.1.0 — One honest number** | now | `#######...` 71% | 5 | 12 |
+| **v0.1.0 — One honest number** | now | `########..` 76% | 4 | 13 |
 | **v0.2.0 — Same day, same roster** | next | `..........` 0% | 4 | 0 |
 
 ## v0.1.0 — One honest number
@@ -30,7 +30,7 @@
 - [ ] **ST-13** — First publish by hand, then trusted publishing · med · S · release
 - [x] **ST-18** — The conflict gate passes when it cannot read the plugin list · high · S · gates, tests · `main`
 - [x] **ST-19** — A verdict survives losing whole positive queries · med · S · report · `main`
-- [ ] **ST-20** — The report records less than compare needs · med · M · report
+- [x] **ST-20** — The report records less than compare needs · med · M · report · `main`
 - [ ] **ST-21** — Nothing reminds the user to re-enable a plugin · med · S · gates
 
 ## v0.2.0 — Same day, same roster
