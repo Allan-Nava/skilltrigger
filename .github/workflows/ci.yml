@@ -49,7 +49,7 @@ jobs:
       - run: npm pack --dry-run
 
   # BACKLOG.md is the single source of truth; ROADMAP.md is generated from it and the
-  # issues are synced from it, both by backlogsync (pinned by commit). A malformed item
+  # issues are synced from it, both by backlogsync (pinned to its release tag). A malformed item
   # or a stale roadmap fails here; the planner's own tests live in backlogsync (ST-22).
   backlog:
     runs-on: ubuntu-latest
@@ -58,6 +58,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: Allan-Nava/backlogsync@974f2bd96a7030af8f30eab093b05b7b46482ede
+      - uses: Allan-Nava/backlogsync@backlogsync--v0.1.0
         with:
           command: check

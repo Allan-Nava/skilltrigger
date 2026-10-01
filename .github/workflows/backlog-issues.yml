@@ -50,7 +50,7 @@ jobs:
           node-version: 24
       # backlogsync prints the plan before it applies anything, so the run's log says
       # what it was about to do even if a write fails (ST-22).
-      - uses: Allan-Nava/backlogsync@974f2bd96a7030af8f30eab093b05b7b46482ede
+      - uses: Allan-Nava/backlogsync@backlogsync--v0.1.0
         with:
           command: sync
           dry-run: ${{ github.event.inputs.dry_run == 'true' }}

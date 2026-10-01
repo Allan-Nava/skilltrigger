@@ -17,9 +17,9 @@
   },
   "scripts": {
     "test": "node bin/skilltrigger.mjs check && node --test",
-    "backlog": "npx --yes https://codeload.github.com/Allan-Nava/backlogsync/tar.gz/974f2bd96a7030af8f30eab093b05b7b46482ede check",
+    "backlog": "npx --yes backlogsync@0.1.0 check",
     "build:site": "node site/build.mjs",
-    "roadmap": "npx --yes https://codeload.github.com/Allan-Nava/backlogsync/tar.gz/974f2bd96a7030af8f30eab093b05b7b46482ede roadmap"
+    "roadmap": "npx --yes backlogsync@0.1.0 roadmap"
   },
   "backlogsync": {
     "prefix": "ST",
@@ -66,7 +66,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Allan-Nava/skilltrigger"
+    "url": "git+https://github.com/Allan-Nava/skilltrigger.git"
   },
   "homepage": "https://allan-nava.github.io/skilltrigger/",
   "bugs": "https://github.com/Allan-Nava/skilltrigger/issues",

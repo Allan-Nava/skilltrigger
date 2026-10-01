@@ -146,11 +146,13 @@ version, the model and the roster size.
 The drift rule — re-measure the baseline the same day, in the same environment — is
 advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
 
-- [ ] **ST-23 — backlogsync by version, not by commit**: ST-22 pins backlogsync by commit
+- [x] **ST-23 — backlogsync by version, not by commit**: ST-22 pins backlogsync by commit
   because no release exists yet. Once its 0.1.0 is tagged and on npm, move every pin —
   `package.json`'s two scripts, the CI `backlog` job, `backlog-issues.yml` and the
   reusable `release-drift.yml` — to the tag, and `npm run backlog` to `npx backlogsync`.
-  <!-- st: prio=low size=S labels=project -->
+  Done 2026-10-01: the action and the reusable workflow at `@backlogsync--v0.1.0`, the
+  scripts on `npx backlogsync@0.1.0`.
+  <!-- st: prio=low size=S labels=project ver=main -->
 - [ ] **ST-14 — Baseline and rewrite in one invocation**: `run --baseline-description`
   measures the old text and the new one interleaved, run by run, in one preflight, so
   both numbers share the day, the CLI, the model and the roster by construction, and the
