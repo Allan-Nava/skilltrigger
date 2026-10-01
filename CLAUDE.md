@@ -36,7 +36,6 @@ test/
   fixtures/            a skill, a plugin carrying the same skill, an eval set
   *.test.mjs           node --test
 scripts/
-  backlog.mjs          BACKLOG.md → ROADMAP.md, issue sync (backlog_test.mjs, fixtures/)
   release-notes.mjs    the CHANGELOG section a release's notes open with
   social.mjs           renders assets/social-preview.png with headless Chrome
 site/build.mjs         site/dist/index.html from README.md (gitignored output)
@@ -91,7 +90,7 @@ run** — that is ST-12.
 
 ```bash
 npm test               # check + node --test, against the fake claude
-npm run backlog        # BACKLOG.md lints, ROADMAP.md is in step
+npm run backlog        # BACKLOG.md lints, ROADMAP.md is in step (backlogsync)
 npm run build:site     # site/dist/index.html from README.md
 npm pack --dry-run     # bin/, README, CHANGELOG, LICENSE — nothing else
 ```

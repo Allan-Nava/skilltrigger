@@ -58,8 +58,10 @@ when the card's text goes stale; the card references `logo.svg` by a relative pa
 ## Backlog, roadmap, issues
 
 `BACKLOG.md` is the single source of truth, ids `ST-n`. After editing it run
-`node scripts/backlog.mjs roadmap` and commit `ROADMAP.md` in the same commit. The
-issues follow on push to `main` (`backlog-issues.yml`), one way only.
+`npm run roadmap` and commit `ROADMAP.md` in the same commit. The issues follow on push
+to `main` (`backlog-issues.yml`), one way only. All three — the check, the roadmap and the
+sync — are [backlogsync](https://github.com/Allan-Nava/backlogsync), pinned by commit in
+`package.json` and the workflows; bump the three pins together.
 
 ## Pull requests
 

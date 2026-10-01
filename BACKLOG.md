@@ -5,7 +5,7 @@ the CHANGELOG, the `thoughts/` artifacts and the issues can reference them. New 
 here rather than into scattered TODO comments.
 
 [ROADMAP.md](ROADMAP.md) is a **generated** view of this file, grouped by milestone. Do
-not edit it by hand — run `node scripts/backlog.mjs roadmap` after touching this file,
+not edit it by hand — run `npm run roadmap` (backlogsync) after touching this file,
 or CI fails. The GitHub issues are another generated view, synced one way on every push
 to `main` that changes this file.
 
@@ -128,12 +128,24 @@ version, the model and the roster size.
   `<out>/.skilltrigger-toggles`; `preflight` (now with `--out`) and the end of `run` print
   the enable command while the plugin stays disabled, and forget it once it is enabled or
   uninstalled. <!-- st: prio=med size=S labels=gates ver=main -->
+- [x] **ST-22 — The backlog tooling is backlogsync's**: `scripts/backlog.mjs` was one of
+  seven diverged copies of the same script. Replace it, its test and fixtures with
+  backlogsync pinned by commit — the CI `backlog` job and `backlog-issues.yml` through its
+  action, `npm run backlog` / `npm run roadmap` through its tarball, `release-drift.yml`
+  through its reusable workflow — keeping the label set and its `prio-med` colour. The
+  pilot of backlogsync's 0.1.0 gate (BS-10). Done 2026-10-01.
+  <!-- st: prio=med size=S labels=project ver=main -->
 
 ## v0.2.0 — Same day, same roster <!-- ms: phase=next -->
 
 The drift rule — re-measure the baseline the same day, in the same environment — is
 advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
 
+- [ ] **ST-23 — backlogsync by version, not by commit**: ST-22 pins backlogsync by commit
+  because no release exists yet. Once its 0.1.0 is tagged and on npm, move every pin —
+  `package.json`'s two scripts, the CI `backlog` job, `backlog-issues.yml` and the
+  reusable `release-drift.yml` — to the tag, and `npm run backlog` to `npx backlogsync`.
+  <!-- st: prio=low size=S labels=project -->
 - [ ] **ST-14 — Baseline and rewrite in one invocation**: `run --baseline-description`
   measures the old text and the new one interleaved, run by run, in one preflight, so
   both numbers share the day, the CLI, the model and the roster by construction, and the
