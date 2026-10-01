@@ -56,7 +56,8 @@ test('a different model, CLI or roster is a warning: the number belongs to the r
 })
 
 // ST-20: counts alone call two different rosters of one size the same environment.
-const named = (commandNames, skillNames) => ({ slashCommands: commandNames.length, skills: skillNames.length, commandNames, skillNames })
+// compare only ever sees hashes; any distinct strings stand in for them here.
+const named = (commandHashes, skillHashes) => ({ slashCommands: commandHashes.length, skills: skillHashes.length, commandHashes, skillHashes })
 
 test('rosters of the same size with different members are a warning naming what moved', () => {
   const ra = named(['alpha', 'beta', 'gamma'], ['s-one', 's-two'])
@@ -64,12 +65,12 @@ test('rosters of the same size with different members are a warning naming what 
   const c = compare({ ...A, roster: ra }, { ...B, roster: rb })
   const w = c.warnings.find((x) => /roster members differ/.test(x))
   assert.ok(w, c.warnings.join('\n'))
-  assert.match(w, /slash commands: added delta; removed gamma/)
-  assert.match(w, /skills: added s-three; removed s-two/)
+  assert.match(w, /slash commands: 1 added \(delta\); 1 removed \(gamma\)/)
+  assert.match(w, /skills: 1 added \(s-three\); 1 removed \(s-two\)/)
   assert.ok(!c.warnings.some((x) => /roster differs: /.test(x)), 'the counts agree, so no count warning')
 })
 
-test('identical members are no warning; a report without names compares by counts alone', () => {
+test('identical members are no warning; a report without hashes compares by counts alone', () => {
   const r = named(['alpha', 'beta'], ['s-one'])
   assert.deepEqual(compare({ ...A, roster: r }, { ...B, roster: { ...r } }).warnings, [])
   assert.deepEqual(compare({ ...A, roster: { slashCommands: 2, skills: 1 } }, { ...B, roster: r }).warnings, [])

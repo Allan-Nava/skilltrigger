@@ -143,7 +143,6 @@ export function toMarkdown(rep) {
     ...(partialLine(rep) ? [`${cell(partialLine(rep).replace(/^m/, 'M'))}.`, ''] : []),
     `${t.passed} of ${t.queries} queries pass. Two runs per query resolve to ±1 per query: read a difference of one hit as noise.`,
     '',
-    ...(rep.roster?.commandNames ? ['## Roster', '', `Slash commands: ${cell(rep.roster.commandNames.join(', ') || '(none)')}`, '', ...(rep.roster.skillNames ? [`Skills: ${cell(rep.roster.skillNames.join(', ') || '(none)')}`, ''] : [])] : []),
   ]
   return out.join('\n')
 }

@@ -11,6 +11,7 @@
 //   sleep       the machine cannot sleep mid-run (macOS: caffeinate), else a warning
 //   roster      how many slash commands and skills the model sees, from the init event
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -87,11 +88,14 @@ async function roundTrip({ env, model }) {
 function rosterGate(init) {
   if (!init) return g('roster', 'fail', 'no init event in the stream — the roster cannot be recorded', 'update the CLI: `claude update`; the init event of `claude -p --output-format stream-json --verbose` lists the roster')
   if (!Array.isArray(init.slash_commands)) return g('roster', 'fail', 'the init event lists no slash_commands — the roster cannot be recorded', 'update the CLI: `claude update`')
-  // Names, sorted, beside the counts: two rosters of one size can differ in members
-  // (ST-20). The preflight project holds no stub, so no stub name can be among them.
-  const names = (list) => [...new Set(list.map((s) => (typeof s === 'string' ? s : s?.name)).filter(Boolean))].sort()
+  // Members beside the counts: two rosters of one size can differ (ST-20). Hashed, not
+  // named — the first 12 hex digits of each name's SHA-256, sorted — because the roster
+  // is every command and skill on the machine, private ones included, and a report is
+  // meant to be pasted. The preflight project holds no stub, so no stub is among them.
+  const tag = (name) => createHash('sha256').update(name).digest('hex').slice(0, 12)
+  const hashes = (list) => [...new Set(list.map((s) => (typeof s === 'string' ? s : s?.name)).filter(Boolean).map(tag))].sort()
   const skillList = Array.isArray(init.skills) ? init.skills : null
-  const roster = { slashCommands: init.slash_commands.length, skills: skillList ? skillList.length : null, commandNames: names(init.slash_commands), skillNames: skillList ? names(skillList) : null }
+  const roster = { slashCommands: init.slash_commands.length, skills: skillList ? skillList.length : null, commandHashes: hashes(init.slash_commands), skillHashes: skillList ? hashes(skillList) : null }
   const skills = roster.skills === null ? '' : `, ${roster.skills} skills`
   return { ...g('roster', 'ok', `${roster.slashCommands} slash commands${skills} visible to the model`), roster, model: init.model ?? null, entries: [...init.slash_commands, ...(Array.isArray(init.skills) ? init.skills.map((s) => (typeof s === 'string' ? s : s?.name)) : [])].filter(Boolean) }
 }

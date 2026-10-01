@@ -66,8 +66,8 @@ Do not weaken these; they are the tool's whole reason to exist.
    — never under `~/.claude` — and prints the enable command while the plugin stays
    disabled (ST-21).
 7. **The report carries queries, counts and versions only** — plus the roster's member
-   names and the model each run reported (ST-20); no description text, no paths, no stub
-   names, no stderr. The inherited environment is counted, never quoted.
+   hashes (12 hex digits of each name's SHA-256 — a roster names private skills) and the
+   model each run reported (ST-20); no description text, no paths, no names, no stderr. The inherited environment is counted, never quoted.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 

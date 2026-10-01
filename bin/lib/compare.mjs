@@ -13,10 +13,11 @@
 const rosterSize = (r) => (r?.roster ? r.roster.slashCommands : null)
 const fmtRoster = (r) => (r?.roster ? `${r.roster.slashCommands} slash commands${r.roster.skills == null ? '' : `, ${r.roster.skills} skills`}` : 'unknown')
 
-// Added and removed names, per kind; null when either report predates the names.
+// Added and removed members, per kind, by hash — the report carries no names. Skipped
+// when either report predates the hashes.
 function memberDiff(a, b) {
   const parts = []
-  for (const [key, label] of [['commandNames', 'slash commands'], ['skillNames', 'skills']]) {
+  for (const [key, label] of [['commandHashes', 'slash commands'], ['skillHashes', 'skills']]) {
     const na = a.roster?.[key]
     const nb = b.roster?.[key]
     if (!Array.isArray(na) || !Array.isArray(nb)) continue
@@ -24,7 +25,7 @@ function memberDiff(a, b) {
     const sb = new Set(nb)
     const added = nb.filter((n) => !sa.has(n))
     const removed = na.filter((n) => !sb.has(n))
-    if (added.length || removed.length) parts.push(`${label}: ${[added.length ? `added ${added.join(', ')}` : '', removed.length ? `removed ${removed.join(', ')}` : ''].filter(Boolean).join('; ')}`)
+    if (added.length || removed.length) parts.push(`${label}: ${[added.length ? `${added.length} added (${added.join(', ')})` : '', removed.length ? `${removed.length} removed (${removed.join(', ')})` : ''].filter(Boolean).join('; ')}`)
   }
   return parts
 }

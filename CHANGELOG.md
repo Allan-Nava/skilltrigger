@@ -7,7 +7,8 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ### Added
 - The report records what `compare` needs to tell two environments apart: the roster's
-  members (names only, sorted) beside its counts; the model each run's `init` event
+  members beside its counts, each as the first 12 hex digits of its name's SHA-256 — a
+  roster names private skills, and a report is meant to be shared; the model each run's `init` event
   reported, per run and counted in `runModels`; and a count of what the inherited
   environment contributed — memory files for the temporary project and for the user,
   hooks configured, MCP servers in the `init` event — never their contents, paths or
@@ -20,7 +21,7 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
   as `run` does. Nothing is enabled or disabled by skilltrigger itself (ST-21).
 
 ### Changed
-- `compare` warns when roster members differ, listing the names added and removed, not
+- `compare` warns when roster members differ, counting the members added and removed by hash, not
   only when the counts differ; and when the models the runs reported or the inherited
   environment's counts differ. Reports without the new fields compare as before (ST-20).
 

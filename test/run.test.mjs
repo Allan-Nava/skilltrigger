@@ -1,6 +1,7 @@
 // `skilltrigger run` end to end against the fake claude: the outcomes, the verdict
 // rule, the report, and what the runner leaves behind (nothing).
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -243,7 +244,7 @@ test('the report: date, versions, roster, settings, every outcome — and nothin
 // ST-20: the report records what compare needs to tell two environments apart — the
 // roster's members, the model each run reported, and what the inherited environment
 // contributed, counted — and still no description text, path or stub name.
-test('the report: roster members, per-run model, the environment counted — still no text, path or stub', async () => {
+test('the report: roster members hashed, per-run model, the environment counted — still no name, text, path or stub', async () => {
   const SECRET = 'private memory text that must not leak'
   const setup = (dir) => {
     const config = join(dir, 'home', '.claude')
@@ -255,7 +256,8 @@ test('the report: roster members, per-run model, the environment counted — sti
   const r = await run({ ...healthy, FAKE_CLAUDE_COMMANDS: '3', FAKE_CLAUDE_SKILLS: '2', FAKE_CLAUDE_ROSTER_EXTRA: 'zeta-cmd', FAKE_CLAUDE_MCP: '2', FAKE_CLAUDE_RUN_MODEL: 'fake-model-2' }, [], { setup })
   assert.equal(r.code, 0, r.out)
   const rep = r.report
-  assert.deepEqual(rep.roster, { slashCommands: 4, skills: 3, commandNames: ['cmd-1', 'cmd-2', 'cmd-3', 'zeta-cmd'], skillNames: ['skill-1', 'skill-2', 'zeta-cmd'] })
+  const h = (names) => names.map((n) => createHash('sha256').update(n).digest('hex').slice(0, 12)).sort()
+  assert.deepEqual(rep.roster, { slashCommands: 4, skills: 3, commandHashes: h(['cmd-1', 'cmd-2', 'cmd-3', 'zeta-cmd']), skillHashes: h(['skill-1', 'skill-2', 'zeta-cmd']) })
   assert.equal(rep.model, 'fake-model-1', 'the preflight model, as before')
   assert.deepEqual(rep.runModels, { 'fake-model-2': 8 })
   assert.deepEqual(rep.queries[0].models, ['fake-model-2', 'fake-model-2'])
@@ -265,8 +267,7 @@ test('the report: roster members, per-run model, the environment counted — sti
   assert.equal(rep.environment.mcpServers, 2)
   assert.match(r.md, /fake-model-2/)
   assert.match(r.md, /2 user memory file/)
-  assert.match(r.md, /zeta-cmd/)
-  for (const leak of [SECRET, 'Demonstrates a skill', SKILL, 'stub-', 'fixtures', 'home', 'CLAUDE.md', 'settings.json', 'skilltrigger-run-', 'skilltrigger-preflight-']) {
+  for (const leak of [SECRET, 'zeta-cmd', 'cmd-1', 'skill-1', 'Demonstrates a skill', SKILL, 'stub-', 'fixtures', 'home', 'CLAUDE.md', 'settings.json', 'skilltrigger-run-', 'skilltrigger-preflight-']) {
     assert.ok(!r.reportText.includes(leak), `the report carries ${leak}`)
     assert.ok(!r.md.includes(leak), `the Markdown carries ${leak}`)
   }
