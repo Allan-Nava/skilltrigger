@@ -71,23 +71,49 @@ One concern per pull request; `npm test` green; a CHANGELOG entry under
 ## Releasing
 
 Releases run from GitHub Actions; pushing the tag is the manual step, and
-`release-drift.yml` fails when `main` carries a version with no tag for two hours —
-unless the CHANGELOG heading for that version says `not released`, as 0.0.1's does.
+`release-drift.yml` fails once the version merged on `main` has gone two hours without
+its tag — unless the CHANGELOG heading for that version says `not released`, as 0.0.1's
+does. 0.0.2's does not, so the drift check goes red two hours after the 0.0.2 merge until
+step 3 below is done.
 
-**The first publish is by hand.** npm cannot configure a trusted publisher for a package
-that does not exist, so the first version (0.1.0, after the measurement gate ST-11) is
-published from a clean checkout of the tagged commit:
+**The first publish is by hand: 0.0.2.** npm cannot configure a trusted publisher for a
+package that does not exist, so the first version on npm — 0.0.2, decided 2026-10-01,
+ahead of the measurement gate on 0.1.0 (ST-11, ST-12) — goes up by hand, in this order:
 
-```bash
-npm test && npm pack --dry-run
-npm publish --access public
-```
+1. On a clean checkout of `main` at the merged release commit, log in and publish:
 
-Then on npmjs.com → package → Settings → Trusted Publisher → GitHub Actions: user
-`Allan-Nava`, repository `skilltrigger` (the name, not the URL), workflow `release.yml`,
-environment empty. Push the tag afterwards: `release.yml` sees the version already on
-the registry, skips the publish, and still cuts the release and closes the milestone.
-Never give `actions/setup-node` a `registry-url`; never rename `release.yml`.
+   ```bash
+   git checkout main && git pull --ff-only && git status --short   # must print nothing
+   npm test && npm pack --dry-run
+   npm login
+   npm publish --access public
+   ```
+
+2. Configure the trusted publisher, either from the command line — `npm trust` needs
+   npm 11.15 or later; `npx npm@11.19.0`, the version `release.yml` pins, runs it
+   without upgrading the global npm:
+
+   ```bash
+   npx npm@11.19.0 trust github skilltrigger --repo Allan-Nava/skilltrigger --file release.yml --allow-publish
+   ```
+
+   or on npmjs.com → package → Settings → Trusted Publisher → GitHub Actions: owner
+   `Allan-Nava` exactly, repository `skilltrigger` (the name, not the URL), workflow
+   `release.yml`, environment empty.
+
+3. Push the tag on that same commit:
+
+   ```bash
+   git tag skilltrigger--v0.0.2 && git push origin skilltrigger--v0.0.2
+   ```
+
+   `release.yml` sees 0.0.2 already on the registry, skips the publish, and still cuts
+   the GitHub release. It closes only a milestone titled `v0.0.2` exactly, or
+   `v0.0.2 ` and a subtitle, and there is none — the `v0.1.0` milestone is left as it
+   is. Then tick ST-13 with `ver=0.0.2`.
+
+From 0.1.0 on, every version is published by `release.yml` over OIDC, on a tag. Never
+give `actions/setup-node` a `registry-url`; never rename `release.yml`.
 
 **Every later release:**
 
@@ -102,7 +128,8 @@ git tag skilltrigger--v{version} && git push origin skilltrigger--v{version}
 ```
 
 The tag triggers `release.yml`: version check, tests, publish over OIDC, wait for the
-registry, GitHub release, close the milestone whose title starts with `v{version}`.
+registry, GitHub release, close the milestone titled `v{version}` — alone or followed by
+a space and a subtitle, so `v0.1.1` never closes `v0.1.10 — …`.
 Re-run with `gh workflow run Release -f tag=skilltrigger--v{version}`; every step is
 idempotent. The notes open with the version's CHANGELOG section
 (`scripts/release-notes.mjs`); a **Breaking** entry goes first under its heading, and

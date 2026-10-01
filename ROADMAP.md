@@ -15,24 +15,24 @@
 
 ## v0.1.0 — One honest number
 
-- [x] **ST-1** — The brief · high · S · project, docs · `main`
-- [x] **ST-2** — Gates: cli, auth, round trip · high · M · gates · `main`
-- [x] **ST-3** — Gate: plugin conflict · high · M · gates · `main`
-- [x] **ST-4** — Gate: sleep · med · S · gates · `main`
-- [x] **ST-5** — Gate: roster · high · S · gates · `main`
-- [x] **ST-6** — The serial runner and the stream detector · high · L · runner · `main`
-- [x] **ST-7** — The verdict rule and the report · high · M · report · `main`
-- [x] **ST-8** — compare · med · S · report · `main`
-- [x] **ST-9** — The fake claude and the tests · high · M · tests · `main`
-- [x] **ST-10** — The repository · med · M · project, release · `main`
+- [x] **ST-1** — The brief · high · S · project, docs · `0.0.2`
+- [x] **ST-2** — Gates: cli, auth, round trip · high · M · gates · `0.0.2`
+- [x] **ST-3** — Gate: plugin conflict · high · M · gates · `0.0.2`
+- [x] **ST-4** — Gate: sleep · med · S · gates · `0.0.2`
+- [x] **ST-5** — Gate: roster · high · S · gates · `0.0.2`
+- [x] **ST-6** — The serial runner and the stream detector · high · L · runner · `0.0.2`
+- [x] **ST-7** — The verdict rule and the report · high · M · report · `0.0.2`
+- [x] **ST-8** — compare · med · S · report · `0.0.2`
+- [x] **ST-9** — The fake claude and the tests · high · M · tests · `0.0.2`
+- [x] **ST-10** — The repository · med · M · project, release · `0.0.2`
 - [ ] **ST-11** — The first real measurement: qrspi's three skills · high · M · report, docs
 - [ ] **ST-12** — Check the stream shapes against a live CLI · high · S · runner, tests
 - [ ] **ST-13** — First publish by hand, then trusted publishing · med · S · release
-- [x] **ST-18** — The conflict gate passes when it cannot read the plugin list · high · S · gates, tests · `main`
-- [x] **ST-19** — A verdict survives losing whole positive queries · med · S · report · `main`
-- [x] **ST-20** — The report records less than compare needs · med · M · report · `main`
-- [x] **ST-21** — Nothing reminds the user to re-enable a plugin · med · S · gates · `main`
-- [x] **ST-22** — The backlog tooling is backlogsync's · med · S · project · `main`
+- [x] **ST-18** — The conflict gate passes when it cannot read the plugin list · high · S · gates, tests · `0.0.2`
+- [x] **ST-19** — A verdict survives losing whole positive queries · med · S · report · `0.0.2`
+- [x] **ST-20** — The report records less than compare needs · med · M · report · `0.0.2`
+- [x] **ST-21** — Nothing reminds the user to re-enable a plugin · med · S · gates · `0.0.2`
+- [x] **ST-22** — The backlog tooling is backlogsync's · med · S · project · `0.0.2`
 
 ## v0.2.0 — Same day, same roster
 

@@ -168,14 +168,16 @@ jobs:
           gh release edit "$TAG" --notes-file /tmp/notes.md
 
       # Only when it is actually finished — a milestone with open issues stays
-      # open, and says so in the log.
+      # open, and says so in the log. The title must be `v<version>` alone or followed
+      # by a space ("v0.1.0 — One honest number"): a bare prefix match would let
+      # 0.0.2 close "v0.0.20 — …", or 0.1.1 close "v0.1.10 — …".
       - name: Close the milestone
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           NUM=$(gh api "repos/$GITHUB_REPOSITORY/milestones?state=open" \
-                  --jq ".[] | select(.title | startswith(\"v$VERSION\")) | .number" | head -1)
+                  --jq ".[] | select(.title == \"v$VERSION\" or (.title | startswith(\"v$VERSION \"))) | .number" | head -1)
           if [ -z "$NUM" ]; then
             echo "::notice::no open milestone titled v$VERSION — nothing to close"
             exit 0

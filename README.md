@@ -4,7 +4,7 @@
 
 **skilltrigger measures how often a Claude Code skill's `description` makes the model load it** — on prompts that should trigger it and on near-misses that should not — and refuses to report a number it cannot trust. Six things have been seen to turn that measurement into a clean-looking zero that means nothing; each one is a gate it must pass first or a field recorded beside the result.
 
-**Status:** 0.0.1, not released. The gate on 0.1.0 is one real measurement: the maintainer runs skilltrigger on the three skills of the [qrspi](https://github.com/Allan-Nava/qrspi) plugin, with their `evals/trigger/*.json` sets, and the result is recorded, dated, beside the 2026-09-18 numbers in qrspi's CONTRIBUTING. Until then every number skilltrigger has produced came from the fake `claude` its tests use.
+**Status:** 0.0.2, on npm — an early version that **has not yet been run against a live `claude` CLI**. Every number skilltrigger has produced so far came from the fake `claude` its tests use, and the stream shapes it reads are unconfirmed on a real run. The gate on 0.1.0 is one real measurement: the maintainer runs skilltrigger on the three skills of the [qrspi](https://github.com/Allan-Nava/qrspi) plugin, with their `evals/trigger/*.json` sets, and the result is recorded, dated, beside the 2026-09-18 numbers in qrspi's CONTRIBUTING.
 
 ## What it measures
 
@@ -32,14 +32,25 @@ Each was hit in practice, with skill-creator's harness, between 2026-09-09 and 2
 
 skilltrigger needs Node 18 or later and a logged-in [Claude Code](https://code.claude.com/docs) CLI on `PATH`. It has no runtime dependencies.
 
-Not yet on npm. From a checkout:
+From npm, without installing:
+
+```bash
+npx skilltrigger preflight
+```
+
+or installed, so the `skilltrigger` command is on `PATH`:
+
+```bash
+npm install -g skilltrigger
+skilltrigger preflight
+```
+
+From a checkout:
 
 ```bash
 git clone https://github.com/Allan-Nava/skilltrigger && cd skilltrigger
 node bin/skilltrigger.mjs preflight
 ```
-
-Once 0.1.0 is published: `npx skilltrigger preflight`, or `npm install -g skilltrigger`.
 
 ## Usage
 
