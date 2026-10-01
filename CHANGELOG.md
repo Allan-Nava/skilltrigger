@@ -5,6 +5,13 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+## [0.0.2] — 2026-10-01
+
+Tested only against the fake `claude` the tests use, never against a live CLI — the
+first live run is the gate on 0.1.0 (ST-11, ST-12). The first version on npm, published
+by hand so that trusted publishing can be configured (ST-13); it carries 0.0.1, which was
+never released, and the entries below.
+
 ### Added
 - The report records what `compare` needs to tell two environments apart: the roster's
   members beside its counts, each as the first 12 hex digits of its name's SHA-256 — a
@@ -43,6 +50,9 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
   says no plugins are installed, is still zero plugins and passes; the human-form
   fallback for an older CLI without `--json` stays. `--allow-conflict` lets an
   unreadable list through as a recorded warning (ST-18).
+- `release.yml` closes only the milestone titled `v<version>`, alone or followed by a
+  space and a subtitle. It matched any title starting with `v<version>`, so a 0.0.2 tag
+  could have closed a `v0.0.20` milestone, and 0.1.1 one called `v0.1.10` (ST-13).
 
 ## [0.0.1] — 2026-10-01 — not released
 
