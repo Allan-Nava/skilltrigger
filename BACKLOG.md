@@ -95,6 +95,27 @@ version, the model and the roster size.
   (`npm publish --access public`), then the publisher is bound to `release.yml`; every
   later version is a tag. <!-- st: prio=med size=S labels=release -->
 
+- [ ] **ST-18 — The conflict gate passes when it cannot read the plugin list**: found by
+  the ST-1 Questions phase, 2026-10-01. When `claude plugin list --json` exits 0 with output
+  `parsePluginList` cannot read, the list is empty and the gate says `ok` with zero plugins
+  checked (`bin/lib/gates.mjs`, `bin/lib/plugins.mjs`) — the very false pass the tool exists
+  to refuse. An unparseable list must fail the gate, with the raw shape's first line in the
+  reason; add the fake-CLI case. <!-- st: prio=high size=S labels=gates,tests -->
+- [ ] **ST-19 — A verdict survives losing whole positive queries**: two positive queries can
+  lose every run to timeouts or errors and the report still gives a verdict, because the 10%
+  rule counts runs, not queries (`bin/lib/report.mjs`). No verdict when any query lost all its
+  runs, or say which queries the number leaves out. <!-- st: prio=med size=S labels=report -->
+- [ ] **ST-20 — The report records less than compare needs**: `compare` checks the roster by
+  its count, so two rosters of the same size with different members look identical; each
+  run's model is collected and dropped (`bin/lib/runner.mjs`); the environment every run
+  inherits — memory files, hooks, MCP servers — is not recorded at all. Record the roster's
+  members (names only), the per-run model, and a summary of what the environment contributed.
+  <!-- st: prio=med size=M labels=report -->
+- [ ] **ST-21 — Nothing reminds the user to re-enable a plugin**: once a conflicting plugin is
+  disabled it is no longer a conflict, so neither `preflight` nor `run` mentions it again.
+  Remember the toggle the gate printed and print the re-enable command at the end of a run.
+  <!-- st: prio=med size=S labels=gates -->
+
 ## v0.2.0 — Same day, same roster <!-- ms: phase=next -->
 
 The drift rule — re-measure the baseline the same day, in the same environment — is
