@@ -116,9 +116,10 @@ version, the model and the roster size.
   run's model is collected and dropped (`bin/lib/runner.mjs`); the environment every run
   inherits — memory files, hooks, MCP servers — is not recorded at all. Record the roster's
   members (names only), the per-run model, and a summary of what the environment contributed.
-  Done 2026-10-01: `roster.commandNames`/`skillNames`, `queries[].models` and `runModels`,
-  `environment` counted by `bin/lib/environment.mjs`; `compare` lists the members added
-  and removed, and warns on run models and environment counts. The `mcp_servers` field is
+  Done 2026-10-01: `roster.commandHashes`/`skillHashes` (12 hex digits of each name's SHA-256,
+  not the names: a roster names private skills), `queries[].models` and `runModels`,
+  `environment` counted by `bin/lib/environment.mjs`; `compare` counts the members added
+  and removed by hash, and warns on run models and environment counts. The `mcp_servers` field is
   unverified on a live CLI (ST-12). <!-- st: prio=med size=M labels=report ver=main -->
 - [x] **ST-21 — Nothing reminds the user to re-enable a plugin**: once a conflicting plugin is
   disabled it is no longer a conflict, so neither `preflight` nor `run` mentions it again.
