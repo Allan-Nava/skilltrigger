@@ -20,6 +20,7 @@ import { findConflicts, parsePluginList, toggleCommands } from './plugins.mjs'
 export const PONG_PROMPT = 'Reply with exactly: pong'
 const g = (id, status, detail, fix) => ({ id, status, detail, ...(fix ? { fix } : {}) })
 const firstLine = (s) => String(s ?? '').trim().split('\n')[0].slice(0, 200)
+const truncate = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
 async function cliGate(env) {
   const r = await execClaude(['--version'], { env, timeoutMs: 15000 })
@@ -90,10 +91,20 @@ function rosterGate(init) {
 async function conflictGate({ env, skillName, allowConflict, rosterEntries }) {
   const r = await execClaude(['plugin', 'list', '--json'], { env, timeoutMs: 30000 })
   let plugins = parsePluginList(r.stdout)
-  if (!plugins.length && r.code !== 0) {
+  let asked = { cmd: 'claude plugin list --json', r }
+  if (r.code !== 0 && !plugins?.length) {
     // An older CLI without --json: the human form.
     const plain = await execClaude(['plugin', 'list'], { env, timeoutMs: 30000 })
     plugins = parsePluginList(plain.stdout)
+    asked = { cmd: 'claude plugin list', r: plain }
+  }
+  if (plugins === null) {
+    // Unreadable is not empty: a list in a new shape would otherwise read as "no plugins"
+    // and the gate would pass with nothing checked (ST-18).
+    const got = truncate(firstLine(asked.r.stdout || asked.r.stderr), 80) || '(nothing)'
+    const detail = `cannot read the plugin list: \`${asked.cmd}\` exited ${asked.r.code}${asked.r.timedOut ? ' (timed out)' : ''} and printed "${got}" — which plugins are enabled is unknown`
+    const fix = ['run `claude plugin list --json` by hand; if the CLI changed its output, update skilltrigger or report the shape', '--allow-conflict measures anyway and records that it did']
+    return { ...g('conflict', allowConflict ? 'warn' : 'fail', allowConflict ? `${detail} (allowed by --allow-conflict, recorded in the report)` : detail, fix.join('\n')), unreadable: true }
   }
   const enabled = plugins.filter((p) => p.enabled)
   if (!skillName) return g('conflict', 'warn', `no --skill given, so nothing to compare against ${enabled.length} enabled plugin(s)${enabled.length ? `: ${enabled.map((p) => p.id).join(', ')}` : ''}`, 'pass --skill <dir> to check this gate')
@@ -147,7 +158,7 @@ export async function preflight({ env = process.env, model = null, skillName = n
     gates.push(roster)
     facts.roster = roster.roster ?? null
     facts.model = model ?? roster.model ?? null
-    facts.conflictAllowed = conflict.status === 'warn' && Boolean(conflict.conflicts?.length)
+    facts.conflictAllowed = conflict.status === 'warn' && Boolean(conflict.conflicts?.length || conflict.unreadable)
   }
   return { gates, ok: !gates.some((x) => x.status === 'fail'), facts }
 }

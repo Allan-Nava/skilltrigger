@@ -17,12 +17,21 @@ const split = (id) => {
   return at > 0 ? { name: id.slice(0, at), marketplace: id.slice(at + 1) } : { name: id, marketplace: null }
 }
 
+// → the plugins, [] when the output says there are none, or null when it is in no shape
+// this parser knows. The two answers are kept apart on purpose: "zero plugins" lets the
+// conflict gate pass, "could not read" must not (ST-18).
 export function parsePluginList(stdout) {
   const text = String(stdout ?? '').trim()
+  if (!text) return null
   if (text.startsWith('[')) {
+    let list
     try {
-      return JSON.parse(text).map((p) => ({ id: p.id, ...split(p.id), enabled: p.enabled !== false, scope: p.scope ?? null, installPath: p.installPath ?? null }))
-    } catch {}
+      list = JSON.parse(text)
+    } catch {
+      return null
+    }
+    if (!Array.isArray(list) || !list.every((p) => typeof p?.id === 'string' && p.id)) return null
+    return list.map((p) => ({ id: p.id, ...split(p.id), enabled: p.enabled !== false, scope: p.scope ?? null, installPath: p.installPath ?? null }))
   }
   // The human form:   ❯ name@marketplace / Version: / Scope: / Status: ✔ enabled
   const out = []
@@ -40,7 +49,10 @@ export function parsePluginList(stdout) {
     const status = line.match(/^\s*Status:\s*(.*)$/i)
     if (status) cur.enabled = !/disabled/i.test(status[1])
   }
-  return out
+  if (out.length) return out
+  // A human form that says so: "No plugins installed.", or a heading over "(none)".
+  if (/\bno plugins\b/i.test(text) || /^installed plugins:\s*(\(none\))?\s*$/i.test(text.replace(/\s+/g, ' ').trim())) return []
+  return null
 }
 
 export function pluginSkills(installPath) {

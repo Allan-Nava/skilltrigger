@@ -102,6 +102,57 @@ test('conflict: the roster catches a shadowing skill the plain-text plugin list 
   assert.match(r.out, /claude plugin disable demo@market/)
 })
 
+// ST-18: a plugin list exiting 0 in a shape the parser cannot read used to leave the list
+// empty and the gate ok with zero plugins checked — the false pass the gate exists to refuse.
+test('conflict: a plugin list that exits 0 but cannot be read fails, quoting its first line', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage' }, ['--skill', SKILL])
+  assert.equal(r.code, 2, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*fail\b.*cannot read/)
+  assert.match(line(r.out, 'conflict'), /Plugin listing moved to a new format/)
+  assert.ok(!line(r.out, 'conflict').includes('second line'), 'only the first line is quoted')
+  assert.doesNotMatch(r.out, /0 enabled plugin\(s\) checked/)
+})
+
+test('conflict: the first line quoted from an unreadable list is truncated', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage-long' }, ['--skill', SKILL])
+  assert.equal(r.code, 2, r.out)
+  const l = line(r.out, 'conflict')
+  assert.match(l, /…/)
+  assert.ok(!l.includes('y'.repeat(150)), 'not the whole line')
+})
+
+test('conflict: a JSON envelope the parser does not know is unreadable too', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'envelope' }, ['--skill', SKILL])
+  assert.equal(r.code, 2, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*fail\b.*cannot read.*\{/)
+})
+
+test('conflict: unreadable fails without --skill as well — a run would refuse on it', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage' })
+  assert.equal(r.code, 2, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*fail\b/)
+})
+
+test('conflict: an empty JSON list is zero plugins installed, and passes', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'empty' }, ['--skill', SKILL])
+  assert.equal(r.code, 0, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*ok\b.*0 enabled plugin\(s\) checked/)
+})
+
+test('conflict: an older CLI without --json falls back to the human form', async () => {
+  // The human form carries no install path, so the plugins are counted, not opened.
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'no-json-flag' }, ['--skill', SKILL])
+  assert.equal(r.code, 0, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*ok\b.*2 enabled plugin\(s\) checked/)
+  assert.ok(r.log.some((l) => l.argv[0] === 'plugin' && l.argv[1] === 'list' && !l.argv.includes('--json')), 'the plain form was asked for')
+})
+
+test('conflict: --allow-conflict lets an unreadable list through as a recorded warning', async () => {
+  const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'garbage' }, ['--skill', SKILL, '--allow-conflict'])
+  assert.equal(r.code, 0, r.out)
+  assert.match(line(r.out, 'conflict'), /^\s*warn\b.*cannot read/)
+})
+
 test('conflict: without --skill there is nothing to compare, and it says so', async () => {
   const r = await preflight({ FAKE_CLAUDE_PLUGINS: 'conflict' })
   assert.equal(r.code, 0, r.out)

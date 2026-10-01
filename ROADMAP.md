@@ -4,13 +4,13 @@
 
 > This page is **generated** from [BACKLOG.md](BACKLOG.md), the single source of truth for planned work. Regenerate it with `node scripts/backlog.mjs roadmap` after editing the backlog — CI fails when the two disagree.
 
-**21 items · 10 shipped · 11 open · 2 milestones.**
+**21 items · 11 shipped · 10 open · 2 milestones.**
 
 ## At a glance
 
 | Milestone | Phase | Progress | Open | Shipped |
 |---|---|---|---|---|
-| **v0.1.0 — One honest number** | now | `######....` 59% | 7 | 10 |
+| **v0.1.0 — One honest number** | now | `######....` 65% | 6 | 11 |
 | **v0.2.0 — Same day, same roster** | next | `..........` 0% | 4 | 0 |
 
 ## v0.1.0 — One honest number
@@ -28,7 +28,7 @@
 - [ ] **ST-11** — The first real measurement: qrspi's three skills · high · M · report, docs
 - [ ] **ST-12** — Check the stream shapes against a live CLI · high · S · runner, tests
 - [ ] **ST-13** — First publish by hand, then trusted publishing · med · S · release
-- [ ] **ST-18** — The conflict gate passes when it cannot read the plugin list · high · S · gates, tests
+- [x] **ST-18** — The conflict gate passes when it cannot read the plugin list · high · S · gates, tests · `main`
 - [ ] **ST-19** — A verdict survives losing whole positive queries · med · S · report
 - [ ] **ST-20** — The report records less than compare needs · med · M · report
 - [ ] **ST-21** — Nothing reminds the user to re-enable a plugin · med · S · gates

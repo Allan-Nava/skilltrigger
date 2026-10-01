@@ -95,12 +95,15 @@ version, the model and the roster size.
   (`npm publish --access public`), then the publisher is bound to `release.yml`; every
   later version is a tag. <!-- st: prio=med size=S labels=release -->
 
-- [ ] **ST-18 — The conflict gate passes when it cannot read the plugin list**: found by
+- [x] **ST-18 — The conflict gate passes when it cannot read the plugin list**: found by
   the ST-1 Questions phase, 2026-10-01. When `claude plugin list --json` exits 0 with output
   `parsePluginList` cannot read, the list is empty and the gate says `ok` with zero plugins
   checked (`bin/lib/gates.mjs`, `bin/lib/plugins.mjs`) — the very false pass the tool exists
   to refuse. An unparseable list must fail the gate, with the raw shape's first line in the
-  reason; add the fake-CLI case. <!-- st: prio=high size=S labels=gates,tests -->
+  reason; add the fake-CLI case. Done 2026-10-01: `parsePluginList` answers `null` for a
+  shape it does not know and `[]` only for an empty JSON array or a human form saying no
+  plugins; the gate fails on `null` with the first line, truncated; four new fake modes.
+  <!-- st: prio=high size=S labels=gates,tests ver=main -->
 - [ ] **ST-19 — A verdict survives losing whole positive queries**: two positive queries can
   lose every run to timeouts or errors and the report still gives a verdict, because the 10%
   rule counts runs, not queries (`bin/lib/report.mjs`). No verdict when any query lost all its

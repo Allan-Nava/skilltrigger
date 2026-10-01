@@ -5,6 +5,15 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Fixed
+- The conflict gate no longer passes when it cannot read the plugin list. Output from
+  `claude plugin list --json` in a shape the parser does not know used to read as zero
+  plugins and the gate said `ok` with nothing checked; it now fails, quoting the first
+  line of what it got, truncated. A valid empty JSON array, or a human-form list that
+  says no plugins are installed, is still zero plugins and passes; the human-form
+  fallback for an older CLI without `--json` stays. `--allow-conflict` lets an
+  unreadable list through as a recorded warning (ST-18).
+
 ## [0.0.1] — 2026-10-01 — not released
 
 The first version, in the repository only: the gates, the runner, the report and their
