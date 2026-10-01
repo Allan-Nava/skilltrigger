@@ -54,7 +54,8 @@ Do not weaken these; they are the tool's whole reason to exist.
    `not-triggered` count towards a rate. An authentication failure or API error line is
    `error`. A run whose `init` event does not list the stub is `error`.
 4. **More than 10% timeouts and errors is no verdict**, exit 3, and the run stops as
-   soon as that share of the plan is passed.
+   soon as that share of the plan is passed. **So is a query that lost every run** — the
+   share counts runs, not queries, and must not hide a whole query (ST-19).
 5. **Nothing under `~/.claude` is written.** Runs live in `mkdtemp` directories that
    are removed; every `claude -p` gets `--no-session-persistence`. Plugin install
    directories are read, never written.

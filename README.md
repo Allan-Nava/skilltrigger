@@ -15,7 +15,7 @@ A skill's description sits in the model's context permanently; the model reads i
 
 Each run is one `claude -p` in a fresh temporary project that holds a single stub command whose frontmatter `description` is the text under test. The stub is **loaded** when the model's first decisive message carries a tool call that names it — `Skill` or `SlashCommand` with the stub's name in its input, or a `Read` of the stub file. A first message that only fetches tool schemas (`ToolSearch`) does not decide; the next one does. Anything else first — a text answer, another tool, another skill — is a run that did **not** trigger. Detection happens on the partial stream events, and the process is stopped at the decision.
 
-Each run ends in one of four outcomes: `triggered`, `not-triggered`, `timeout`, `error`. Only the first two are measurements. A timeout or an error is never counted as "did not trigger", and when more than 10% of the runs are either, there is **no verdict**: the report says so and the command exits 3.
+Each run ends in one of four outcomes: `triggered`, `not-triggered`, `timeout`, `error`. Only the first two are measurements. A timeout or an error is never counted as "did not trigger", and when more than 10% of the runs are either, there is **no verdict**: the report says so and the command exits 3. The share counts runs, so it is not the only rule: a query that lost *every* run to timeouts or errors is also no verdict, with the lost queries named — otherwise two positives could vanish inside the 10% and the positives total would quietly leave them out. A query that lost some of its runs but not all keeps the verdict, and the report flags it as measured on fewer runs than planned.
 
 ## The six traps
 
@@ -70,7 +70,7 @@ To judge a rewrite, measure the baseline the same day, in the same environment, 
 
 ## The report
 
-Each run writes `<out>/<date>-<skill>.json` and a Markdown rendering beside it (a second report the same day gets `-2`). It holds the date, the skilltrigger and CLI versions, the model, the roster size, runs per query, the timeout, the pass threshold (a trigger rate of 0.5) and the no-verdict threshold (10%), each query with every outcome and its hits/runs, and the totals — positives triggered, negatives fired, timeouts and errors counted apart.
+Each run writes `<out>/<date>-<skill>.json` and a Markdown rendering beside it (a second report the same day gets `-2`). It holds the date, the skilltrigger and CLI versions, the model, the roster size, runs per query, the timeout, the pass threshold (a trigger rate of 0.5) and the no-verdict threshold (10%), each query with every outcome and its hits/runs, and the totals — positives triggered, negatives fired, timeouts and errors counted apart — plus the queries that lost every run (`lostQueries`, which make it no verdict) and those measured on fewer runs than planned (`partialQueries`).
 
 Nothing else is in it: no description text (a byte count and a SHA-256 stand in for it, so `compare` can tell two texts apart), no paths, no stub names, no stderr. A report can be committed or pasted into an issue as it is.
 
@@ -78,7 +78,7 @@ Nothing else is in it: no description text (a byte count and a SHA-256 stand in 
 
 - **It never touches `~/.claude`.** Every run happens in its own temporary directory, removed afterwards; nothing is written under the user's configuration, and every `claude -p` gets `--no-session-persistence`, so the runs are not saved as sessions either. The conflict gate reads a plugin's install directory and writes nothing there.
 - **It never runs in parallel.** See the first trap.
-- **It never reports a number through a failed gate.** A failed gate refuses the run; more than 10% of runs timing out or failing is no verdict, and the run stops as soon as that share is passed, because every further run would be spent on a number that will not be reported.
+- **It never reports a number through a failed gate.** A failed gate refuses the run; more than 10% of runs timing out or failing is no verdict, and so is a query that lost every run; the run stops as soon as that share is passed, because every further run would be spent on a number that will not be reported.
 - **It never disables a plugin itself.** It prints the commands.
 - It never sends anything anywhere but through the `claude` CLI it is measuring with.
 

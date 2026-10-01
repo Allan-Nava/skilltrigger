@@ -145,6 +145,55 @@ test('at or under 10% the verdict stands, and the error is counted apart', async
   }
 })
 
+// ST-19: the 10% rule counts runs, so two positives can lose every run and the verdict
+// stand on a positives denominator quietly shrunk. A query with nothing measured is no
+// verdict; a query that lost only some runs keeps the verdict and is flagged.
+const twenty = (s, modes) => {
+  const items = Array.from({ length: 20 }, (_, i) => ({ query: `query number ${i}`, should_trigger: i < 10 }))
+  const evals = join(s.dir, 'twenty.json')
+  writeFileSync(evals, JSON.stringify(items))
+  const map = Object.fromEntries(items.map((it) => [it.query, it.should_trigger ? 'trigger' : 'miss']))
+  return { evals, map: { ...map, ...modes } }
+}
+
+test('two positive queries losing every run is no verdict, though the share stays at 10%', async () => {
+  const s = scratch()
+  try {
+    const { evals, map } = twenty(s, { 'query number 3': 'hang', 'query number 7': 'hang' })
+    const r = await run(queries(map), ['--timeout', '1'], { evals })
+    assert.equal(r.report.totals.timeouts, 4)
+    assert.equal(r.report.totals.executed, 40, 'not stopped: 4 of 40 is not more than 10%')
+    assert.equal(r.code, 3, r.out)
+    assert.equal(r.report.verdict, 'no-verdict')
+    assert.deepEqual(r.report.lostQueries, ['query number 3', 'query number 7'])
+    assert.match(r.out, /no verdict/i)
+    assert.match(r.out, /query number 3/)
+    assert.match(r.out, /lost every run/)
+    assert.match(r.md, /No verdict/)
+    assert.match(r.md, /query number 7/)
+  } finally {
+    s.cleanup()
+  }
+})
+
+test('a query that lost some but not all of its runs keeps the verdict and is flagged', async () => {
+  const s = scratch()
+  try {
+    const { evals, map } = twenty(s, { 'query number 3': ['hang', 'trigger'] })
+    const r = await run(queries(map), ['--timeout', '1'], { evals })
+    assert.equal(r.code, 0, r.out)
+    assert.equal(r.report.verdict, 'ok')
+    assert.deepEqual(r.report.lostQueries, [])
+    assert.deepEqual(r.report.partialQueries, ['query number 3'])
+    assert.equal(r.report.queries[3].partial, true)
+    assert.equal(r.report.queries[4].partial, false)
+    assert.match(r.out, /measured on fewer runs than planned.*1 query/i)
+    assert.match(r.md, /\| query number 3 \| yes \| 1\/1 \| 1 \| 0 \| pass \(1 of 2 runs\) \|/)
+  } finally {
+    s.cleanup()
+  }
+})
+
 test('a failed gate refuses the run: no query is ever sent', async () => {
   const r = await run({ ...healthy, FAKE_CLAUDE_AUTH: 'out' })
   assert.equal(r.code, 2)

@@ -104,10 +104,13 @@ version, the model and the roster size.
   shape it does not know and `[]` only for an empty JSON array or a human form saying no
   plugins; the gate fails on `null` with the first line, truncated; four new fake modes.
   <!-- st: prio=high size=S labels=gates,tests ver=main -->
-- [ ] **ST-19 — A verdict survives losing whole positive queries**: two positive queries can
+- [x] **ST-19 — A verdict survives losing whole positive queries**: two positive queries can
   lose every run to timeouts or errors and the report still gives a verdict, because the 10%
   rule counts runs, not queries (`bin/lib/report.mjs`). No verdict when any query lost all its
-  runs, or say which queries the number leaves out. <!-- st: prio=med size=S labels=report -->
+  runs, or say which queries the number leaves out. Done 2026-10-01: both — a query with
+  every run lost is no verdict, exit 3, named in the headline and in `lostQueries`; one
+  that lost only some runs keeps the verdict and is flagged in `partialQueries`.
+  <!-- st: prio=med size=S labels=report ver=main -->
 - [ ] **ST-20 — The report records less than compare needs**: `compare` checks the roster by
   its count, so two rosters of the same size with different members look identical; each
   run's model is collected and dropped (`bin/lib/runner.mjs`); the environment every run

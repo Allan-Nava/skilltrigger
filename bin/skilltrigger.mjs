@@ -16,7 +16,7 @@ import { UsageError, number, parseArgs } from './lib/args.mjs'
 import { checkRepo } from './lib/check.mjs'
 import { compare } from './lib/compare.mjs'
 import { formatGates, preflight } from './lib/gates.mjs'
-import { NO_VERDICT_SHARE, headline, summarise, writeReport } from './lib/report.mjs'
+import { NO_VERDICT_SHARE, headline, partialLine, summarise, writeReport } from './lib/report.mjs'
 import { runAll } from './lib/runner.mjs'
 import { loadEvalSet, loadSkill } from './lib/skill.mjs'
 
@@ -115,6 +115,7 @@ async function cmdRun(argv) {
   })
   const files = writeReport(rep, outDir)
   console.log(`\n${headline(rep)}`)
+  if (partialLine(rep)) console.log(partialLine(rep))
   if (rep.verdict === 'ok') console.log(`per query: ${rep.totals.passed}/${rep.totals.queries} pass at a trigger rate threshold of ${rep.triggerThreshold}; no-verdict threshold ${rep.noVerdictThreshold * 100}% of runs`)
   console.log(`report: ${files.json}\n        ${files.md}`)
   return rep.verdict === 'ok' ? 0 : 3

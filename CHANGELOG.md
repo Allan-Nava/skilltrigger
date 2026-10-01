@@ -6,6 +6,12 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 ## [Unreleased]
 
 ### Fixed
+- A verdict no longer survives losing whole queries. The 10% rule counts runs, so two
+  positive queries could lose every run to timeouts or errors and the report still gave
+  a verdict on a smaller positives total. A query that was run and measured nothing is
+  now no verdict, exit 3, with the lost queries named in the headline and recorded as
+  `lostQueries`; a query that lost some but not all of its runs keeps the verdict and is
+  flagged, in `partialQueries`, in its row and under the table (ST-19).
 - The conflict gate no longer passes when it cannot read the plugin list. Output from
   `claude plugin list --json` in a shape the parser does not know used to read as zero
   plugins and the gate said `ok` with nothing checked; it now fails, quoting the first
