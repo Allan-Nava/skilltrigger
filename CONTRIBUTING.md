@@ -114,7 +114,7 @@ ahead of the measurement gate on 0.1.0 (ST-11, ST-12) — goes up by hand, in th
    `v0.0.2 ` and a subtitle, and there is none — the `v0.1.0` milestone is left as it
    is. Then tick ST-13 with `ver=0.0.2`.
 
-From 0.1.0 on, every version is published by `release.yml` over OIDC, on a tag. Never
+From 0.0.3 on, every version is published by `release.yml` over OIDC, on a tag. Never
 give `actions/setup-node` a `registry-url`; never rename `release.yml`.
 
 **Every later release:**
