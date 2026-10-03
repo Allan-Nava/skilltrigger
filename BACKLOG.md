@@ -172,6 +172,9 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   <!-- st: prio=med size=S labels=report,enhancement -->
 - [ ] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
   is available instead of only warning. <!-- st: prio=low size=S labels=gates,enhancement -->
-- [ ] **ST-17 — A pass-threshold option**: `--threshold` for the per-query rate (0.5
-  today), recorded in the report as it already is.
-  <!-- st: prio=low size=S labels=report,enhancement -->
+- [x] **ST-17 — A pass-threshold option**: `--threshold` for the per-query rate (0.5
+  today), recorded in the report as it already is. Done 2026-10-03: `run --threshold`,
+  strictly between 0 and 1 (`fraction()` in `bin/lib/args.mjs`), reaches `summarise` and
+  both sides of `summarisePaired` and lands in `triggerThreshold`; it moves pass and fail
+  per query, never the totals or the verdict; `compare` warns when two reports differ in
+  it. <!-- st: prio=low size=S labels=report,enhancement ver=main -->

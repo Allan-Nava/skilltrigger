@@ -35,3 +35,13 @@ export function number(opts, name, { fallback, min, integer = false }) {
   if (!Number.isFinite(n) || n < min || (integer && !Number.isInteger(n))) throw new UsageError(`--${name} must be ${integer ? 'an integer' : 'a number'} of at least ${min}, got "${opts[name]}"`)
   return n
 }
+
+// A rate strictly between 0 and 1 (ST-17). At 0 every positive passes and every negative
+// fails, whatever the runs; at 1 a negative passes while it fires on all runs but one.
+export function fraction(opts, name, { fallback }) {
+  if (opts[name] === undefined) return fallback
+  const s = String(opts[name]).trim()
+  const n = s === '' ? NaN : Number(s)
+  if (!Number.isFinite(n) || n <= 0 || n >= 1) throw new UsageError(`--${name} must be a number strictly between 0 and 1, got "${opts[name]}"`)
+  return n
+}

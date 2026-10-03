@@ -18,13 +18,15 @@ export function localDate(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-export function summarise({ items, outcomes, models = [], skillName, description, overridden, facts, runsPerQuery, timeoutSeconds, planned, aborted, toolVersion, date = localDate() }) {
+// The default per-query pass threshold; `run --threshold` moves it (ST-17). It decides pass
+// and fail per query and nothing else — not the totals, not the verdict.
+export function summarise({ items, outcomes, models = [], skillName, description, overridden, facts, runsPerQuery, timeoutSeconds, threshold = TRIGGER_THRESHOLD, planned, aborted, toolVersion, date = localDate() }) {
   const queries = items.map((item, i) => {
     const o = outcomes[i] ?? []
     const hits = o.filter((x) => x === 'triggered').length
     const runs = o.filter((x) => x === 'triggered' || x === 'not-triggered').length
     const rate = runs ? hits / runs : null
-    const pass = rate === null ? null : item.should_trigger ? rate >= TRIGGER_THRESHOLD : rate < TRIGGER_THRESHOLD
+    const pass = rate === null ? null : item.should_trigger ? rate >= threshold : rate < threshold
     // partial: some of its executed runs measured nothing, but not all of them.
     return { ...item, outcomes: o, models: models[i] ?? [], hits, runs, timeouts: o.filter((x) => x === 'timeout').length, errors: o.filter((x) => x === 'error').length, pass, partial: runs > 0 && runs < o.length }
   })
@@ -55,7 +57,7 @@ export function summarise({ items, outcomes, models = [], skillName, description
     environment: facts.environment ?? null,
     runsPerQuery,
     timeoutSeconds,
-    triggerThreshold: TRIGGER_THRESHOLD,
+    triggerThreshold: threshold,
     noVerdictThreshold: NO_VERDICT_SHARE,
     conflictAllowed: Boolean(facts.conflictAllowed),
     description: { bytes: Buffer.byteLength(description), sha256: createHash('sha256').update(description).digest('hex'), overridden: Boolean(overridden) },
@@ -171,8 +173,9 @@ export const INTERLEAVING = 'each query once with each description, back to back
 // What both sides share by construction, lifted to the top of the paired report.
 const SHARED = ['tool', 'toolVersion', 'date', 'skill', 'cliVersion', 'model', 'roster', 'environment', 'runsPerQuery', 'timeoutSeconds', 'triggerThreshold', 'noVerdictThreshold', 'conflictAllowed']
 
-export function summarisePaired({ items, skillName, baseline, candidate, baselineDescription, description, overridden, facts, runsPerQuery, timeoutSeconds, aborted, toolVersion, date = localDate() }) {
-  const common = { items, skillName, facts, runsPerQuery, timeoutSeconds, planned: items.length * runsPerQuery, aborted, toolVersion, date }
+export function summarisePaired({ items, skillName, baseline, candidate, baselineDescription, description, overridden, facts, runsPerQuery, timeoutSeconds, threshold = TRIGGER_THRESHOLD, aborted, toolVersion, date = localDate() }) {
+  // One threshold for both sides: a pass column judged two ways would not compare (ST-17).
+  const common = { items, skillName, facts, runsPerQuery, timeoutSeconds, threshold, planned: items.length * runsPerQuery, aborted, toolVersion, date }
   const base = summarise({ ...common, outcomes: baseline.outcomes, models: baseline.models, description: baselineDescription, overridden: false })
   const cand = summarise({ ...common, outcomes: candidate.outcomes, models: candidate.models, description, overridden })
   const d = deltas(base, cand)

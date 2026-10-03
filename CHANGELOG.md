@@ -5,6 +5,14 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Added
+- `run --threshold <rate>`: the per-query pass threshold, 0.5 by default — a positive
+  passes at a trigger rate of at least that, a negative under it. It must lie strictly
+  between 0 and 1, and is recorded in the report's `triggerThreshold` as before. It
+  decides pass and fail per query only; the totals, the verdict and the exit code do not
+  read it. A paired run judges both sides at the one threshold, and `compare` warns when
+  two reports were judged at different ones (ST-17).
+
 ## [0.0.3] — 2026-10-03
 
 0.0.3 adds `--baseline-description` (ST-14) and still has not been run against a live

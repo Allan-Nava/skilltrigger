@@ -4,8 +4,8 @@
 //
 //   skilltrigger preflight [--model M] [--skill <dir>] [--out <dir>] [--allow-conflict]
 //   skilltrigger run --skill <dir> --eval <file> [--runs 2] [--model M] [--timeout 30]
-//                    [--description "<override>"] [--baseline-description <text|file>]
-//                    [--out <dir>] [--allow-conflict]
+//                    [--threshold 0.5] [--description "<override>"]
+//                    [--baseline-description <text|file>] [--out <dir>] [--allow-conflict]
 //   skilltrigger compare <a.json> <b.json>
 //   skilltrigger check
 //
@@ -13,11 +13,11 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { UsageError, number, parseArgs } from './lib/args.mjs'
+import { UsageError, fraction, number, parseArgs } from './lib/args.mjs'
 import { checkRepo } from './lib/check.mjs'
 import { compare } from './lib/compare.mjs'
 import { formatGates, preflight } from './lib/gates.mjs'
-import { NO_VERDICT_SHARE, headline, localDate, pairedLines, partialLine, summarise, summarisePaired, writeReport } from './lib/report.mjs'
+import { NO_VERDICT_SHARE, TRIGGER_THRESHOLD, headline, localDate, pairedLines, partialLine, summarise, summarisePaired, writeReport } from './lib/report.mjs'
 import { runAll } from './lib/runner.mjs'
 import { loadEvalSet, loadSkill, parseFrontmatter } from './lib/skill.mjs'
 import { formatReminders, readToggles, reconcile, writeToggles } from './lib/toggles.mjs'
@@ -89,6 +89,7 @@ async function cmdRun(argv) {
     runs: 'string',
     model: 'string',
     timeout: 'string',
+    threshold: 'string',
     description: 'string',
     'baseline-description': 'string',
     out: 'string',
@@ -99,6 +100,7 @@ async function cmdRun(argv) {
   if (!opts.eval) throw new UsageError('run needs --eval <file>')
   const runs = number(opts, 'runs', { fallback: 2, min: 1, integer: true })
   const timeout = number(opts, 'timeout', { fallback: 30, min: 0.1 })
+  const threshold = fraction(opts, 'threshold', { fallback: TRIGGER_THRESHOLD })
   const skill = loadSkill(opts.skill)
   const items = loadEvalSet(opts.eval)
   const overridden = opts.description !== undefined
@@ -140,7 +142,7 @@ async function cmdRun(argv) {
   })
   if (res.aborted) console.log(`  stopped: more than ${NO_VERDICT_SHARE * 100}% of the planned runs${baseline === null ? '' : ' of one description'} timed out or failed — no verdict is possible`)
 
-  const common = { items, skillName: skill.name, facts: pf.facts, runsPerQuery: runs, timeoutSeconds: timeout, aborted: res.aborted, toolVersion: pkg.version }
+  const common = { items, skillName: skill.name, facts: pf.facts, runsPerQuery: runs, timeoutSeconds: timeout, threshold, aborted: res.aborted, toolVersion: pkg.version }
   const rep =
     baseline === null
       ? summarise({ ...common, outcomes: res.outcomes, models: res.models, description, overridden, planned })

@@ -87,6 +87,9 @@ export function compare(a, b) {
   const env = environmentDiff(a.environment, b.environment)
   if (env.length) warnings.push(`inherited environment differs: ${env.join(', ')} — memory files, hooks and MCP servers reach the model too`)
   for (const [k, r] of [['a', a], ['b', b]]) if (r.verdict !== 'ok') warnings.push(`report ${k} (${r.date}) has no verdict — its counts are not a measurement`)
+  // Pass and fail per query are judged at the report's threshold (ST-17); the hit counts
+  // compared below are not, but a pass column read across the two would be.
+  if (typeof a.triggerThreshold === 'number' && typeof b.triggerThreshold === 'number' && a.triggerThreshold !== b.triggerThreshold) warnings.push(`pass threshold differs: ${a.triggerThreshold} vs ${b.triggerThreshold} — pass and fail per query were judged differently; the hit counts below are unaffected`)
   if (a.conflictAllowed || b.conflictAllowed) warnings.push('a report was measured with --allow-conflict — a same-named skill was visible')
 
   const { rows, totals, noiseAt } = deltas(a, b)

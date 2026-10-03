@@ -17,7 +17,8 @@ site build.
 ```
 bin/
   skilltrigger.mjs     the CLI: preflight, run, compare, check; exit codes 0/1/2/3
-  lib/args.mjs         argument parser (util.parseArgs is 18.3+, the floor is 18.0)
+  lib/args.mjs         argument parser (util.parseArgs is 18.3+, the floor is 18.0);
+                       `fraction()` holds --threshold strictly between 0 and 1 (ST-17)
   lib/claude.mjs       spawning claude: env minus CLAUDECODE, process-group kill
   lib/gates.mjs        the six gates and their formatting
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
@@ -27,7 +28,7 @@ bin/
   lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run;
                        with a baseline, the two texts interleaved run by run (ST-14)
   lib/report.mjs       summary, verdict rule, JSON + Markdown; the paired report
-  lib/compare.mjs      two reports, drift warnings, noise labels; `deltas()` is the
+  lib/compare.mjs      two reports, drift and threshold warnings, noise labels; `deltas()` is the
                        arithmetic the paired report shares with `compare`
   lib/check.mjs        the repository's own invariants (npm test)
   lib/traps.mjs        the six traps and the README phrase for each
@@ -76,6 +77,11 @@ Do not weaken these; they are the tool's whole reason to exist.
    preflight — so a drift during the run lands on both sides alike. Running all the
    baseline first and the candidate after would reintroduce the drift the flag removes.
    A paired report keeps both sides as complete single reports; `compare` refuses it.
+9. **The pass threshold judges queries, never the run.** `--threshold` (ST-17, strictly
+   between 0 and 1, 0.5 by default) moves pass and fail per query and is recorded as
+   `triggerThreshold`; the totals, the verdict and the exit code do not read it. A paired
+   run judges both sides at the one threshold, and `compare` warns when two reports differ
+   in it.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 
