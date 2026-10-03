@@ -175,17 +175,17 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   them apart for `compare` and the paired report, rows tagged `ctx`, and `compare` warns
   when two reports mark a query differently. Decided: their runs still count towards the
   no-verdict share and the lost-query rule — a timeout is the environment breaking,
-  whatever the prompt asked. <!-- st: prio=med size=S labels=report,enhancement ver=main -->
+  whatever the prompt asked. <!-- st: prio=med size=S labels=report,enhancement ver=0.0.4 -->
 - [x] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
   is available instead of only warning. Done 2026-10-03: the sleep gate (`inhibitGate`
   in `bin/lib/gates.mjs`) runs a node watcher of skilltrigger's pid under `systemd-inhibit
   --what=idle:sleep --mode=block --no-ask-password`, ok once the watcher says it started,
   released when the process exits; not found, refused or silent for 10 s is the warning
   it was. Tested through `test/fake/systemd-inhibit` on PATH; not yet run on a live Linux
-  host. <!-- st: prio=low size=S labels=gates,enhancement ver=main -->
+  host. <!-- st: prio=low size=S labels=gates,enhancement ver=0.0.4 -->
 - [x] **ST-17 — A pass-threshold option**: `--threshold` for the per-query rate (0.5
   today), recorded in the report as it already is. Done 2026-10-03: `run --threshold`,
   strictly between 0 and 1 (`fraction()` in `bin/lib/args.mjs`), reaches `summarise` and
   both sides of `summarisePaired` and lands in `triggerThreshold`; it moves pass and fail
   per query, never the totals or the verdict; `compare` warns when two reports differ in
-  it. <!-- st: prio=low size=S labels=report,enhancement ver=main -->
+  it. <!-- st: prio=low size=S labels=report,enhancement ver=0.0.4 -->

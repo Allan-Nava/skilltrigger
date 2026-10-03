@@ -5,6 +5,12 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+## [0.0.4] — 2026-10-03
+
+0.0.4 adds `--threshold` (ST-17), sleep inhibition on Linux through `systemd-inhibit`
+(ST-16, so far tested only against a fake) and `needs_context` (ST-15); it still has not
+been run against a live CLI, and 0.1.0 waits on ST-11 and ST-12.
+
 ### Added
 - `run --threshold <rate>`: the per-query pass threshold, 0.5 by default — a positive
   passes at a trigger rate of at least that, a negative under it. It must lie strictly

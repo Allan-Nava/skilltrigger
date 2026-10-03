@@ -38,6 +38,6 @@
 
 - [x] **ST-23** — backlogsync by version, not by commit · low · S · project · `0.0.3`
 - [x] **ST-14** — Baseline and rewrite in one invocation · high · M · runner, report, enhancement · `0.0.3`
-- [x] **ST-15** — Prompts that presuppose a session · med · S · report, enhancement · `main`
-- [x] **ST-16** — Sleep inhibition on Linux · low · S · gates, enhancement · `main`
-- [x] **ST-17** — A pass-threshold option · low · S · report, enhancement · `main`
+- [x] **ST-15** — Prompts that presuppose a session · med · S · report, enhancement · `0.0.4`
+- [x] **ST-16** — Sleep inhibition on Linux · low · S · gates, enhancement · `0.0.4`
+- [x] **ST-17** — A pass-threshold option · low · S · report, enhancement · `0.0.4`
