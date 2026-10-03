@@ -152,7 +152,7 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   reusable `release-drift.yml` — to the tag, and `npm run backlog` to `npx backlogsync`.
   Done 2026-10-01: the action and the reusable workflow at `@backlogsync--v0.1.0`, the
   scripts on `npx backlogsync@0.1.0`.
-  <!-- st: prio=low size=S labels=project ver=main -->
+  <!-- st: prio=low size=S labels=project ver=0.0.3 -->
 - [x] **ST-14 — Baseline and rewrite in one invocation**: `run --baseline-description`
   measures the old text and the new one interleaved, run by run, in one preflight, so
   both numbers share the day, the CLI, the model and the roster by construction, and the
@@ -164,7 +164,7 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   sides as complete reports and the per-query deltas with `compare`'s noise labels, from
   the `deltas()` the two now share; `compare` refuses a paired report. The fake tells the
   texts apart with `FAKE_CLAUDE_DESCRIPTIONS`.
-  <!-- st: prio=high size=M labels=runner,report,enhancement ver=main -->
+  <!-- st: prio=high size=M labels=runner,report,enhancement ver=0.0.3 -->
 - [ ] **ST-15 — Prompts that presuppose a session**: an eval-set field (`needs_context`)
   for positives that assume material already in context, reported apart, so the known
   limit of `claude -p` is a column rather than a footnote.

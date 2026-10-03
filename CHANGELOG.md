@@ -5,6 +5,11 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+## [0.0.3] — 2026-10-03
+
+0.0.3 adds `--baseline-description` (ST-14) and still has not been run against a live
+CLI; 0.1.0 waits on ST-11 and ST-12.
+
 ### Added
 - `run --baseline-description <text|file>`: the old description and the new one measured
   in one invocation, under one preflight, interleaved run by run — each query once with

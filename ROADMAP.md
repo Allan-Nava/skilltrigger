@@ -36,8 +36,8 @@
 
 ## v0.2.0 — Same day, same roster
 
-- [x] **ST-23** — backlogsync by version, not by commit · low · S · project · `main`
-- [x] **ST-14** — Baseline and rewrite in one invocation · high · M · runner, report, enhancement · `main`
+- [x] **ST-23** — backlogsync by version, not by commit · low · S · project · `0.0.3`
+- [x] **ST-14** — Baseline and rewrite in one invocation · high · M · runner, report, enhancement · `0.0.3`
 - [ ] **ST-15** — Prompts that presuppose a session · med · S · report, enhancement
 - [ ] **ST-16** — Sleep inhibition on Linux · low · S · gates, enhancement
 - [ ] **ST-17** — A pass-threshold option · low · S · report, enhancement
