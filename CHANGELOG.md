@@ -18,6 +18,15 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
   does on macOS. Without systemd-inhibit, or when logind refuses the lock, the gate warns
   with the reason, as before. Tested against a fake; not yet run on a live Linux host
   (ST-16).
+- An eval-set field, `needs_context: true`, for a positive that presupposes material
+  already in a session. Such a prompt is run like any other and counted apart: out of
+  the positives total and the pass count, into its own group — `totals.needsContext` in
+  the JSON, `needs_context positives triggered` in the summary, a section of its own in
+  the Markdown, a `ctx` row and its own total in `compare` and in a paired report — so the
+  known limit of `claude -p` is a number rather than a footnote. Its runs still count
+  towards the no-verdict rule. The field marks positives only; `compare` warns when two
+  reports mark a shared query differently. An eval set without it gives the report it
+  always did (ST-15).
 
 ## [0.0.3] — 2026-10-03
 

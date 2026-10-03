@@ -31,8 +31,14 @@ export function summarise({ items, outcomes, models = [], skillName, description
     return { ...item, outcomes: o, models: models[i] ?? [], hits, runs, timeouts: o.filter((x) => x === 'timeout').length, errors: o.filter((x) => x === 'error').length, pass, partial: runs > 0 && runs < o.length }
   })
   const sum = (list, k) => list.reduce((a, q) => a + q[k], 0)
-  const pos = queries.filter((q) => q.should_trigger)
-  const neg = queries.filter((q) => !q.should_trigger)
+  // A positive marked needs_context presupposes a session `claude -p` does not have, so it
+  // is counted apart: out of the positives and the pass count, into its own group (ST-15).
+  // Its runs still count towards the no-verdict share and the lost-query rule below — a
+  // timeout is the environment breaking, whatever the prompt asked.
+  const ctx = queries.filter((q) => q.needs_context === true)
+  const counted = queries.filter((q) => q.needs_context !== true)
+  const pos = counted.filter((q) => q.should_trigger)
+  const neg = counted.filter((q) => !q.should_trigger)
   const executed = queries.reduce((a, q) => a + q.outcomes.length, 0)
   const timeouts = sum(queries, 'timeouts')
   const errors = sum(queries, 'errors')
@@ -72,8 +78,9 @@ export function summarise({ items, outcomes, models = [], skillName, description
       negatives: { fired: sum(neg, 'hits'), runs: sum(neg, 'runs') },
       timeouts,
       errors,
-      passed: queries.filter((q) => q.pass === true).length,
-      queries: queries.length,
+      passed: counted.filter((q) => q.pass === true).length,
+      queries: counted.length,
+      ...(ctx.length ? { needsContext: { triggered: sum(ctx, 'hits'), runs: sum(ctx, 'runs'), passed: ctx.filter((q) => q.pass === true).length, queries: ctx.length } } : {}),
     },
     queries,
   }
@@ -90,6 +97,10 @@ export function formatEnvironment(e) {
 export const formatRunModels = (m) => (m && Object.keys(m).length ? Object.entries(m).map(([k, v]) => `${k} ×${v}`).join(', ') : 'none reported')
 const cell = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ')
 
+export const NEEDS_CONTEXT = 'needs_context positives triggered'
+const NEEDS_CONTEXT_HEADING = '## Positives that presuppose a session (`needs_context`)'
+const NEEDS_CONTEXT_NOTE = '`claude -p` starts from nothing: these measure whether the model loads the skill before it goes looking for material a real session would already hold. Counted apart from the positives above; their timeouts and errors still count towards the no-verdict rule.'
+
 const quoted = (list) => list.map((q) => `"${q.length > 60 ? `${q.slice(0, 59)}…` : q}"`).join(', ')
 const queriesWord = (n) => `${n} ${n === 1 ? 'query' : 'queries'}`
 
@@ -104,7 +115,8 @@ export function headline(rep) {
     if (!parts.length) parts.push(`${t.timeouts} timeout(s) and ${t.errors} error(s) in ${t.executed} run(s)`)
     return `no verdict: ${parts.join('; ')}`
   }
-  return `positives triggered ${t.positives.triggered}/${t.positives.runs} · negatives fired ${t.negatives.fired}/${t.negatives.runs} · ${t.timeouts} timeout(s), ${t.errors} error(s) counted apart`
+  const ctx = t.needsContext ? ` · ${NEEDS_CONTEXT} ${t.needsContext.triggered}/${t.needsContext.runs}` : ''
+  return `positives triggered ${t.positives.triggered}/${t.positives.runs} · negatives fired ${t.negatives.fired}/${t.negatives.runs}${ctx} · ${t.timeouts} timeout(s), ${t.errors} error(s) counted apart`
 }
 
 // A line naming the queries that kept the verdict on fewer measured runs than planned.
@@ -153,12 +165,26 @@ export function toMarkdown(rep) {
     '',
     '| Query | Should trigger | Hits/runs | Timeouts | Errors | Pass |',
     '|---|---|---:|---:|---:|---|',
-    ...rep.queries.map((q) => `| ${cell(q.query)} | ${q.should_trigger ? 'yes' : 'no'} | ${q.hits}/${q.runs} | ${q.timeouts} | ${q.errors} | ${passCell(q)} |`),
+    ...rep.queries.filter((q) => q.needs_context !== true).map((q) => `| ${cell(q.query)} | ${q.should_trigger ? 'yes' : 'no'} | ${q.hits}/${q.runs} | ${q.timeouts} | ${q.errors} | ${passCell(q)} |`),
     '',
     ...(partialLine(rep) ? [`${cell(partialLine(rep).replace(/^m/, 'M'))}.`, ''] : []),
     `${t.passed} of ${t.queries} queries pass. Two runs per query resolve to ±1 per query: read a difference of one hit as noise.`,
     '',
   ]
+  if (t.needsContext) {
+    out.push(
+      NEEDS_CONTEXT_HEADING,
+      '',
+      NEEDS_CONTEXT_NOTE,
+      '',
+      '| Query | Hits/runs | Timeouts | Errors | Pass |',
+      '|---|---:|---:|---:|---|',
+      ...rep.queries.filter((q) => q.needs_context === true).map((q) => `| ${cell(q.query)} | ${q.hits}/${q.runs} | ${q.timeouts} | ${q.errors} | ${passCell(q)} |`),
+      '',
+      `${NEEDS_CONTEXT} ${t.needsContext.triggered}/${t.needsContext.runs}; ${t.needsContext.passed} of ${t.needsContext.queries} pass.`,
+      '',
+    )
+  }
   return out.join('\n')
 }
 
@@ -193,14 +219,16 @@ export function summarisePaired({ items, skillName, baseline, candidate, baselin
     baseline: base,
     candidate: cand,
     comparison: {
-      rows: d.rows.map((r) => ({ query: r.query, should_trigger: r.should_trigger, baseline: hr(r.a), candidate: hr(r.b), delta: r.delta, noise: r.noise })),
-      totals: { positives: total(d.totals.positives), negatives: total(d.totals.negatives) },
+      rows: d.rows.map((r) => ({ query: r.query, should_trigger: r.should_trigger, ...(r.needs_context ? { needs_context: true } : {}), baseline: hr(r.a), candidate: hr(r.b), delta: r.delta, noise: r.noise })),
+      totals: { positives: total(d.totals.positives), negatives: total(d.totals.negatives), ...(d.totals.needsContext ? { needsContext: total(d.totals.needsContext) } : {}) },
     },
   }
 }
 
 const sign = (n) => (n > 0 ? `+${n}` : String(n))
 const deltaCell = (r) => `${sign(r.delta)}${r.noise ? ' (noise)' : ''}`
+// pos, neg, or ctx for a positive that presupposes a session (ST-15) — as `compare` tags it.
+const rowTag = (r) => (r.needs_context ? 'ctx' : r.should_trigger ? 'pos' : 'neg')
 const totalLine = (label, t) => `${label} ${t.baseline.hits}/${t.baseline.runs} → ${t.candidate.hits}/${t.candidate.runs} (${sign(t.delta)})${t.noise ? ' (within noise)' : ''}`
 
 // The lines `run` prints at the end of a paired run: each side's headline, then — when
@@ -213,10 +241,11 @@ export function pairedLines(rep) {
     return lines
   }
   lines.push('')
-  for (const r of rep.comparison.rows) lines.push(`  ${r.should_trigger ? 'pos' : 'neg'}  ${r.baseline.hits}/${r.baseline.runs} → ${r.candidate.hits}/${r.candidate.runs}  ${r.delta === 0 ? ' 0' : deltaCell(r)}  ${r.query}`)
+  for (const r of rep.comparison.rows) lines.push(`  ${rowTag(r)}  ${r.baseline.hits}/${r.baseline.runs} → ${r.candidate.hits}/${r.candidate.runs}  ${r.delta === 0 ? ' 0' : deltaCell(r)}  ${r.query}`)
   lines.push('')
   lines.push(totalLine('positives triggered', rep.comparison.totals.positives))
   lines.push(totalLine('negatives fired', rep.comparison.totals.negatives))
+  if (rep.comparison.totals.needsContext) lines.push(totalLine(NEEDS_CONTEXT, rep.comparison.totals.needsContext))
   return lines
 }
 
@@ -225,11 +254,13 @@ function pairedMarkdown(rep) {
   const bq = new Map(b.queries.map((q) => [q.query, q]))
   const cq = new Map(c.queries.map((q) => [q.query, q]))
   const sideVerdict = (k, side) => `${k}: ${side.verdict === 'ok' ? 'a verdict' : headline(side)}`
+  const row = (r, should = true) => `| ${cell(r.query)} |${should ? ` ${r.should_trigger ? 'yes' : 'no'} |` : ''} ${r.baseline.hits}/${r.baseline.runs} | ${r.candidate.hits}/${r.candidate.runs} | ${r.delta === 0 ? '0' : deltaCell(r)} | ${passCell(bq.get(r.query))} | ${passCell(cq.get(r.query))} |`
+  const ctxRows = comparison.rows.filter((r) => r.needs_context)
   const out = [
     `# skilltrigger — ${rep.skill}, ${rep.date}, baseline vs candidate`,
     '',
     rep.verdict === 'ok'
-      ? `**${totalLine('positives triggered', comparison.totals.positives)} · ${totalLine('negatives fired', comparison.totals.negatives)}**`
+      ? `**${[totalLine('positives triggered', comparison.totals.positives), totalLine('negatives fired', comparison.totals.negatives), ...(comparison.totals.needsContext ? [totalLine(NEEDS_CONTEXT, comparison.totals.needsContext)] : [])].join(' · ')}**`
       : `**No verdict.** ${cell([sideVerdict('baseline', b), sideVerdict('candidate', c)].join('; '))}. The per-query counts below are not a measurement.`,
     '',
     ...environmentRows(rep, {
@@ -240,7 +271,7 @@ function pairedMarkdown(rep) {
     '',
     '| Query | Should trigger | Baseline | Candidate | Delta | Baseline pass | Candidate pass |',
     '|---|---|---:|---:|---:|---|---|',
-    ...comparison.rows.map((r) => `| ${cell(r.query)} | ${r.should_trigger ? 'yes' : 'no'} | ${r.baseline.hits}/${r.baseline.runs} | ${r.candidate.hits}/${r.candidate.runs} | ${r.delta === 0 ? '0' : deltaCell(r)} | ${passCell(bq.get(r.query))} | ${passCell(cq.get(r.query))} |`),
+    ...comparison.rows.filter((r) => !r.needs_context).map((r) => row(r)),
     '',
     `- baseline: ${cell(headline(b))}`,
     `- candidate: ${cell(headline(c))}`,
@@ -252,6 +283,20 @@ function pairedMarkdown(rep) {
     `Baseline: ${b.totals.passed} of ${b.totals.queries} queries pass; candidate: ${c.totals.passed} of ${c.totals.queries}. Two runs per query resolve to ±1 per query: a difference of one hit is labelled noise, and so is a total difference of up to two.`,
     '',
   ]
+  if (comparison.totals.needsContext) {
+    out.push(
+      NEEDS_CONTEXT_HEADING,
+      '',
+      NEEDS_CONTEXT_NOTE,
+      '',
+      '| Query | Baseline | Candidate | Delta | Baseline pass | Candidate pass |',
+      '|---|---:|---:|---:|---|---|',
+      ...ctxRows.map((r) => row(r, false)),
+      '',
+      totalLine(NEEDS_CONTEXT, comparison.totals.needsContext),
+      '',
+    )
+  }
   return out.join('\n')
 }
 

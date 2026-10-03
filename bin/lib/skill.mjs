@@ -1,6 +1,7 @@
 // The two inputs: a skill's SKILL.md (its name and description) and an eval set in
 // skill-creator's format — a JSON array of { query, should_trigger }, any other field
-// carried through untouched.
+// carried through untouched. One field of skilltrigger's own is read: `needs_context`,
+// true on a positive that presupposes material already in a session (ST-15).
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -75,6 +76,8 @@ export function parseEvalSet(text) {
     if (!it || typeof it !== 'object') throw new Error(`item ${i}: not an object`)
     if (typeof it.query !== 'string' || !it.query.trim()) throw new Error(`item ${i}: query must be a non-empty string`)
     if (typeof it.should_trigger !== 'boolean') throw new Error(`item ${i}: should_trigger must be true or false`)
+    if (it.needs_context !== undefined && typeof it.needs_context !== 'boolean') throw new Error(`item ${i}: needs_context must be true or false`)
+    if (it.needs_context === true && !it.should_trigger) throw new Error(`item ${i}: needs_context marks a positive that presupposes a session; this item should not trigger`)
     if (seen.has(it.query)) throw new Error(`item ${i}: duplicate query — compare matches reports by query text`)
     seen.add(it.query)
   })

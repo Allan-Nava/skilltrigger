@@ -152,7 +152,8 @@ async function cmdRun(argv) {
   else {
     console.log(`\n${headline(rep)}`)
     if (partialLine(rep)) console.log(partialLine(rep))
-    if (rep.verdict === 'ok') console.log(`per query: ${rep.totals.passed}/${rep.totals.queries} pass at a trigger rate threshold of ${rep.triggerThreshold}; no-verdict threshold ${rep.noVerdictThreshold * 100}% of runs`)
+    const ctx = rep.totals.needsContext ? `; needs_context: ${rep.totals.needsContext.passed}/${rep.totals.needsContext.queries} pass, counted apart` : ''
+    if (rep.verdict === 'ok') console.log(`per query: ${rep.totals.passed}/${rep.totals.queries} pass at a trigger rate threshold of ${rep.triggerThreshold}${ctx}; no-verdict threshold ${rep.noVerdictThreshold * 100}% of runs`)
   }
   console.log(`report: ${files.json}\n        ${files.md}`)
   const after = formatReminders(pf.reminders, { after: true })

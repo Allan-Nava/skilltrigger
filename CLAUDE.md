@@ -25,10 +25,13 @@ bin/
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
   lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
   lib/toggles.mjs      the re-enable reminder: the gate's toggles, kept under --out
+  lib/skill.mjs        SKILL.md frontmatter and the eval set; `needs_context` marks a
+                       positive, and only a positive (ST-15)
   lib/stream.mjs       the detector: one run's events → an outcome
   lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run;
                        with a baseline, the two texts interleaved run by run (ST-14)
-  lib/report.mjs       summary, verdict rule, JSON + Markdown; the paired report
+  lib/report.mjs       summary, verdict rule, JSON + Markdown; the paired report; the
+                       needs_context group, counted apart (ST-15)
   lib/compare.mjs      two reports, drift and threshold warnings, noise labels; `deltas()` is the
                        arithmetic the paired report shares with `compare`
   lib/check.mjs        the repository's own invariants (npm test)
@@ -89,6 +92,12 @@ Do not weaken these; they are the tool's whole reason to exist.
     ends when skilltrigger exits, nothing persistent is changed and no password is asked
     (`--no-ask-password`). On Linux a missing or refused inhibitor is a warning, as it was
     before — many a headless machine has nothing to inhibit — never a failure.
+11. **A positive that presupposes a session is counted apart, never dropped.** An eval
+    item with `needs_context: true` (ST-15) is run like any other, then left out of the
+    positives total and the pass count and reported as its own group — `totals.needsContext`,
+    a `ctx` row in `compare`, its own Markdown section. Its runs still count towards the
+    no-verdict share and the lost-query rule: a timeout is the environment breaking,
+    whatever the prompt asked. An eval set without the field gives the report it always did.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 

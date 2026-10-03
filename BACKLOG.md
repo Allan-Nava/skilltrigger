@@ -166,10 +166,16 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   the `deltas()` the two now share; `compare` refuses a paired report. The fake tells the
   texts apart with `FAKE_CLAUDE_DESCRIPTIONS`.
   <!-- st: prio=high size=M labels=runner,report,enhancement ver=0.0.3 -->
-- [ ] **ST-15 — Prompts that presuppose a session**: an eval-set field (`needs_context`)
+- [x] **ST-15 — Prompts that presuppose a session**: an eval-set field (`needs_context`)
   for positives that assume material already in context, reported apart, so the known
-  limit of `claude -p` is a column rather than a footnote.
-  <!-- st: prio=med size=S labels=report,enhancement -->
+  limit of `claude -p` is a column rather than a footnote. Done 2026-10-03:
+  `parseEvalSet` takes `needs_context` as a boolean on positives only; `summarise` leaves
+  the marked queries out of the positives total and the pass count and totals them in
+  `totals.needsContext`, its own group in the summary and the Markdown; `deltas()` totals
+  them apart for `compare` and the paired report, rows tagged `ctx`, and `compare` warns
+  when two reports mark a query differently. Decided: their runs still count towards the
+  no-verdict share and the lost-query rule — a timeout is the environment breaking,
+  whatever the prompt asked. <!-- st: prio=med size=S labels=report,enhancement ver=main -->
 - [x] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
   is available instead of only warning. Done 2026-10-03: the sleep gate (`inhibitGate`
   in `bin/lib/gates.mjs`) runs a node watcher of skilltrigger's pid under `systemd-inhibit
