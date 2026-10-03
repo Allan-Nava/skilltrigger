@@ -4,7 +4,7 @@
 
 **skilltrigger measures how often a Claude Code skill's `description` makes the model load it** — on prompts that should trigger it and on near-misses that should not — and refuses to report a number it cannot trust. Six things have been seen to turn that measurement into a clean-looking zero that means nothing; each one is a gate it must pass first or a field recorded beside the result.
 
-**Status:** 0.0.3, on npm — an early version that **has not yet been run against a live `claude` CLI**. Every number skilltrigger has produced so far came from the fake `claude` its tests use, and the stream shapes it reads are unconfirmed on a real run. The gate on 0.1.0 is one real measurement: the maintainer runs skilltrigger on the three skills of the [qrspi](https://github.com/Allan-Nava/qrspi) plugin, with their `evals/trigger/*.json` sets, and the result is recorded, dated, beside the 2026-09-18 numbers in qrspi's CONTRIBUTING.
+**Status:** 0.0.4, on npm — an early version that **has not yet been run against a live `claude` CLI**. Every number skilltrigger has produced so far came from the fake `claude` its tests use, and the stream shapes it reads are unconfirmed on a real run. The gate on 0.1.0 is one real measurement: the maintainer runs skilltrigger on the three skills of the [qrspi](https://github.com/Allan-Nava/qrspi) plugin, with their `evals/trigger/*.json` sets, and the result is recorded, dated, beside the 2026-09-18 numbers in qrspi's CONTRIBUTING.
 
 ## What it measures
 

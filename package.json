@@ -1,6 +1,6 @@
 {
   "name": "skilltrigger",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "How often a Claude Code skill's description makes the model load it, on prompts that should trigger it and near-misses that should not, measured behind gates that refuse to report a number they cannot trust.",
   "type": "module",
   "bin": {
