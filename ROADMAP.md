@@ -4,13 +4,13 @@
 
 > This page is **generated** from [BACKLOG.md](BACKLOG.md), the single source of truth for planned work. Regenerate it with `npm run roadmap` after editing the backlog — CI fails when the two disagree.
 
-**23 items · 17 shipped · 6 open · 2 milestones.**
+**23 items · 18 shipped · 5 open · 2 milestones.**
 
 ## At a glance
 
 | Milestone | Phase | Progress | Open | Shipped |
 |---|---|---|---|---|
-| **v0.1.0 — One honest number** | now | `########..` 83% | 3 | 15 |
+| **v0.1.0 — One honest number** | now | `#########.` 89% | 2 | 16 |
 | **v0.2.0 — Same day, same roster** | next | `####......` 40% | 3 | 2 |
 
 ## v0.1.0 — One honest number
@@ -27,7 +27,7 @@
 - [x] **ST-10** — The repository · med · M · project, release · `0.0.2`
 - [ ] **ST-11** — The first real measurement: qrspi's three skills · high · M · report, docs
 - [ ] **ST-12** — Check the stream shapes against a live CLI · high · S · runner, tests
-- [ ] **ST-13** — First publish by hand, then trusted publishing · med · S · release
+- [x] **ST-13** — First publish by hand, then trusted publishing · med · S · release · `0.0.2`
 - [x] **ST-18** — The conflict gate passes when it cannot read the plugin list · high · S · gates, tests · `0.0.2`
 - [x] **ST-19** — A verdict survives losing whole positive queries · med · S · report · `0.0.2`
 - [x] **ST-20** — The report records less than compare needs · med · M · report · `0.0.2`

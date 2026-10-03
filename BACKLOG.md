@@ -91,14 +91,15 @@ version, the model and the roster size.
   token arrives as the synthetic message the detector flags, and that `skills` is
   present; record the CLI version it was confirmed on.
   <!-- st: prio=high size=S labels=runner,tests -->
-- [ ] **ST-13 — First publish by hand, then trusted publishing**: npm cannot configure a
+- [x] **ST-13 — First publish by hand, then trusted publishing**: npm cannot configure a
   trusted publisher for a package that does not exist, so the first publish is 0.0.2, by
   hand (`npm publish --access public`, decided 2026-10-01), ahead of the measurement;
   then the publisher is bound to `release.yml`, the tag `skilltrigger--v0.0.2` cuts the
   release, and 0.1.0 and every later version release from CI on a tag. Left open for the
   maintainer to tick, `ver=0.0.2`, once 0.0.2 is on npm and the trusted publisher is
-  configured — CONTRIBUTING, "Releasing", has the order.
-  <!-- st: prio=med size=S labels=release -->
+  configured — CONTRIBUTING, "Releasing", has the order. Done 2026-10-03: 0.0.2 published by hand on 2026-10-01;
+  the trusted publisher is confirmed by 0.0.3, which `release.yml` published over OIDC.
+  <!-- st: prio=med size=S labels=release ver=0.0.2 -->
 
 - [x] **ST-18 — The conflict gate passes when it cannot read the plugin list**: found by
   the ST-1 Questions phase, 2026-10-01. When `claude plugin list --json` exits 0 with output
