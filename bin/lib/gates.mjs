@@ -8,7 +8,8 @@
 //               model — catches the expired OAuth that auth status can miss, and the
 //               400 an outdated CLI answers for a model it does not know
 //   conflict    no enabled plugin (or other visible skill) shadows the stub
-//   sleep       the machine cannot sleep mid-run (macOS: caffeinate), else a warning
+//   sleep       the machine cannot sleep mid-run (macOS: caffeinate, Linux: systemd-inhibit),
+//               else a warning
 //   roster      how many slash commands and skills the model sees, from the init event
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -134,10 +135,20 @@ async function conflictGate({ env, skillName, allowConflict, rosterEntries }) {
 }
 
 // macOS: `caffeinate -i -s -w <pid>` holds off idle and system sleep for as long as
-// this process lives and exits with it. Elsewhere there is no one portable switch.
-export function sleepGate({ platform = process.platform, caffeinate = '/usr/bin/caffeinate', pid = process.pid } = {}) {
+// this process lives and exits with it. Linux: `systemd-inhibit` has no -w, so it is given
+// a watcher of this process to run — a node one-liner that says it started, then polls the
+// pid and exits when it is gone; the lock is held while the watcher runs (ST-16). No
+// password prompt: a polkit agent asking on the terminal would stall the preflight.
+// Elsewhere there is no one portable switch.
+const AWAKE_ADVICE = 'keep the machine awake for the run, e.g. `systemd-inhibit --what=idle:sleep skilltrigger run …` on Linux'
+const INHIBIT_ARGS = ['--what=idle:sleep', '--who=skilltrigger', '--why=measuring a skill description: a sleep mid-run turns runs into timeouts', '--mode=block', '--no-ask-password']
+const WATCHER = "process.stdout.write('held\\n');const p=Number(process.argv[1]);setInterval(()=>{try{process.kill(p,0)}catch(e){if(e.code==='ESRCH')process.exit(0)}},1000)"
+const INHIBIT_WAIT_MS = 10000
+
+export function sleepGate({ platform = process.platform, caffeinate = '/usr/bin/caffeinate', pid = process.pid, env = process.env } = {}) {
+  if (platform === 'linux') return inhibitGate({ pid, env })
   if (platform !== 'darwin') {
-    return Promise.resolve(g('sleep', 'warn', `cannot hold the machine awake on ${platform}: a sleep mid-run turns runs into timeouts`, 'keep the machine awake for the run, e.g. `systemd-inhibit --what=idle:sleep skilltrigger run …` on Linux'))
+    return Promise.resolve(g('sleep', 'warn', `cannot hold the machine awake on ${platform}: a sleep mid-run turns runs into timeouts`, AWAKE_ADVICE))
   }
   return new Promise((resolve) => {
     const child = spawn(caffeinate, ['-i', '-s', '-w', String(pid)], { stdio: 'ignore', detached: false })
@@ -149,6 +160,40 @@ export function sleepGate({ platform = process.platform, caffeinate = '/usr/bin/
   })
 }
 
+// systemd-inhibit runs the watcher only once logind granted the lock, so the watcher's
+// first line is the proof it is held. Not found, refused (no logind in a container, no
+// right to the lock) or silent: a warning, as on Linux before — not a failure, since many
+// a headless Linux machine has nothing to inhibit.
+function inhibitGate({ pid, env }) {
+  return new Promise((resolve) => {
+    let settled = false
+    let stderr = ''
+    const child = spawn('systemd-inhibit', [...INHIBIT_ARGS, process.execPath, '-e', WATCHER, String(pid)], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: false })
+    const done = (gate) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      child.stdout.destroy()
+      child.stderr.destroy()
+      child.unref()
+      resolve(gate)
+    }
+    const timer = setTimeout(() => {
+      child.kill()
+      done(g('sleep', 'warn', `systemd-inhibit did not take the lock within ${INHIBIT_WAIT_MS / 1000} s: a sleep mid-run turns runs into timeouts`, AWAKE_ADVICE))
+    }, INHIBIT_WAIT_MS)
+    child.stderr.on('data', (d) => (stderr += d))
+    child.stdout.on('data', (d) => {
+      if (String(d).includes('held')) done(g('sleep', 'ok', `systemd-inhibit --what=idle:sleep holds the machine awake until this process exits`))
+    })
+    child.on('error', (e) =>
+      done(e.code === 'ENOENT' ? g('sleep', 'warn', 'systemd-inhibit not found: cannot hold the machine awake on linux, and a sleep mid-run turns runs into timeouts', AWAKE_ADVICE) : g('sleep', 'warn', `could not start systemd-inhibit: ${e.code ?? e.message}`, AWAKE_ADVICE)),
+    )
+    // close, not exit: its stderr is read to the end before the reason is quoted.
+    child.on('close', (code) => done(g('sleep', 'warn', `systemd-inhibit could not take the lock (exit ${code}): ${firstLine(stderr) || 'no reason given'}`, AWAKE_ADVICE)))
+  })
+}
+
 // → { gates, ok, facts: { cliVersion, model, roster, conflictAllowed, environment } }
 export async function preflight({ env = process.env, model = null, skillName = null, allowConflict = false, platform = process.platform } = {}) {
   const gates = []
@@ -157,7 +202,7 @@ export async function preflight({ env = process.env, model = null, skillName = n
   const facts = { cliVersion: cli.version ?? null, model, roster: null, conflictAllowed: false, environment: null }
   if (cli.status !== 'ok') {
     for (const id of ['auth', 'round-trip', 'conflict']) gates.push(g(id, 'skip', 'not run: the cli gate failed'))
-    gates.push(await sleepGate({ platform }))
+    gates.push(await sleepGate({ platform, env }))
     gates.push(g('roster', 'skip', 'not run: the cli gate failed'))
   } else {
     gates.push(await authGate(env))
@@ -166,7 +211,7 @@ export async function preflight({ env = process.env, model = null, skillName = n
     const roster = rosterGate(init)
     const conflict = await conflictGate({ env, skillName, allowConflict, rosterEntries: roster.entries ?? [] })
     gates.push(conflict)
-    gates.push(await sleepGate({ platform }))
+    gates.push(await sleepGate({ platform, env }))
     gates.push(roster)
     facts.roster = roster.roster ?? null
     facts.model = model ?? roster.model ?? null

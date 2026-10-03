@@ -1,11 +1,12 @@
 // Every gate, through the CLI, against the fake claude: the ok case once, then each
 // failure on its own, and that a failure exits 2 with the reason and the fix.
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import { chmodSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { test } from 'node:test'
-import { sleepGate } from '../bin/lib/gates.mjs'
-import { EVALS, SKILL, cli, fakeEnv, readLog, scratch } from './helpers.mjs'
+import { preflight as preflightFn, sleepGate } from '../bin/lib/gates.mjs'
+import { EVALS, FAKE_DIR, SKILL, cli, fakeEnv, readLog, scratch } from './helpers.mjs'
 
 async function preflight(env = {}, args = []) {
   const s = scratch()
@@ -220,10 +221,66 @@ test('roster: the counts are what the init event lists', async () => {
   assert.match(line(r.out, 'roster'), /83 slash commands, 59 skills/)
 })
 
-test('sleep: elsewhere than macOS, a warning and the advice', async () => {
-  const g = await sleepGate({ platform: 'linux' })
+// ST-16: on Linux the gate wraps a watcher of this process in systemd-inhibit. The fake
+// in test/fake/ stands in for it: it logs its arguments, runs the command it was given and
+// logs that command's exit, so the tests see the lock taken and released without
+// depending on the host's OS, init system or rights.
+const waitFor = async (pred) => {
+  for (let i = 0; i < 200 && !pred(); i++) await new Promise((r) => setTimeout(r, 50))
+  return pred()
+}
+const readOr = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : '')
+
+test('sleep: on Linux, systemd-inhibit holds the lock for as long as this process lives', async () => {
+  const { dir, cleanup } = scratch()
+  try {
+    const log = join(dir, 'inhibit.log')
+    // A stand-in for skilltrigger's own process: the lock must outlive the gate and end with it.
+    const target = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 1500)'], { stdio: 'ignore' })
+    const g = await sleepGate({ platform: 'linux', pid: target.pid, env: { PATH: `${FAKE_DIR}${delimiter}/usr/bin${delimiter}/bin`, FAKE_INHIBIT_LOG: log } })
+    assert.equal(g.status, 'ok', g.detail)
+    assert.match(g.detail, /systemd-inhibit --what=idle:sleep/)
+    const [args] = readOr(log).split('\n')
+    for (const flag of ['--what=idle:sleep', '--who=skilltrigger', '--mode=block']) assert.ok(args.split(' ').includes(flag), `${flag} in ${args}`)
+    assert.match(args, /--why=/)
+    assert.ok(args.endsWith(` ${target.pid}`), `the watcher is given the pid: ${args}`)
+    assert.ok(!/exited/.test(readOr(log)), 'still held while the process lives')
+    assert.ok(await waitFor(() => /exited 0/.test(readOr(log))), `released once the process exited: ${readOr(log)}`)
+  } finally {
+    cleanup()
+  }
+})
+
+test('sleep: on Linux without systemd-inhibit, a warning and the advice', async () => {
+  const g = await sleepGate({ platform: 'linux', env: { PATH: '/nonexistent' } })
   assert.equal(g.status, 'warn')
+  assert.match(g.detail, /systemd-inhibit not found/)
   assert.match(g.fix, /systemd-inhibit|sleep/)
+})
+
+test('sleep: on Linux, a systemd-inhibit that cannot take the lock is a warning with its reason', async () => {
+  const g = await sleepGate({ platform: 'linux', env: { PATH: FAKE_DIR, FAKE_INHIBIT: 'fail' } })
+  assert.equal(g.status, 'warn')
+  assert.match(g.detail, /Access denied/)
+})
+
+test('sleep: elsewhere than macOS and Linux, a warning and the advice', async () => {
+  const g = await sleepGate({ platform: 'win32' })
+  assert.equal(g.status, 'warn')
+  assert.match(g.fix, /keep the machine awake/)
+})
+
+test('sleep: the preflight hands the gate its environment, so PATH finds the inhibitor', async () => {
+  const { dir, cleanup } = scratch()
+  try {
+    const log = join(dir, 'inhibit.log')
+    const pf = await preflightFn({ env: fakeEnv(dir, { FAKE_INHIBIT_LOG: log }), platform: 'linux' })
+    const g = pf.gates.find((x) => x.id === 'sleep')
+    assert.equal(g.status, 'ok', g.detail)
+    assert.match(readOr(log), /--what=idle:sleep/)
+  } finally {
+    cleanup()
+  }
 })
 
 test('sleep: on macOS caffeinate is started against this process', async () => {

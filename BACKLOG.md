@@ -166,12 +166,26 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   the `deltas()` the two now share; `compare` refuses a paired report. The fake tells the
   texts apart with `FAKE_CLAUDE_DESCRIPTIONS`.
   <!-- st: prio=high size=M labels=runner,report,enhancement ver=0.0.3 -->
-- [ ] **ST-15 — Prompts that presuppose a session**: an eval-set field (`needs_context`)
+- [x] **ST-15 — Prompts that presuppose a session**: an eval-set field (`needs_context`)
   for positives that assume material already in context, reported apart, so the known
-  limit of `claude -p` is a column rather than a footnote.
-  <!-- st: prio=med size=S labels=report,enhancement -->
-- [ ] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
-  is available instead of only warning. <!-- st: prio=low size=S labels=gates,enhancement -->
-- [ ] **ST-17 — A pass-threshold option**: `--threshold` for the per-query rate (0.5
-  today), recorded in the report as it already is.
-  <!-- st: prio=low size=S labels=report,enhancement -->
+  limit of `claude -p` is a column rather than a footnote. Done 2026-10-03:
+  `parseEvalSet` takes `needs_context` as a boolean on positives only; `summarise` leaves
+  the marked queries out of the positives total and the pass count and totals them in
+  `totals.needsContext`, its own group in the summary and the Markdown; `deltas()` totals
+  them apart for `compare` and the paired report, rows tagged `ctx`, and `compare` warns
+  when two reports mark a query differently. Decided: their runs still count towards the
+  no-verdict share and the lost-query rule — a timeout is the environment breaking,
+  whatever the prompt asked. <!-- st: prio=med size=S labels=report,enhancement ver=main -->
+- [x] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
+  is available instead of only warning. Done 2026-10-03: the sleep gate (`inhibitGate`
+  in `bin/lib/gates.mjs`) runs a node watcher of skilltrigger's pid under `systemd-inhibit
+  --what=idle:sleep --mode=block --no-ask-password`, ok once the watcher says it started,
+  released when the process exits; not found, refused or silent for 10 s is the warning
+  it was. Tested through `test/fake/systemd-inhibit` on PATH; not yet run on a live Linux
+  host. <!-- st: prio=low size=S labels=gates,enhancement ver=main -->
+- [x] **ST-17 — A pass-threshold option**: `--threshold` for the per-query rate (0.5
+  today), recorded in the report as it already is. Done 2026-10-03: `run --threshold`,
+  strictly between 0 and 1 (`fraction()` in `bin/lib/args.mjs`), reaches `summarise` and
+  both sides of `summarisePaired` and lands in `triggerThreshold`; it moves pass and fail
+  per query, never the totals or the verdict; `compare` warns when two reports differ in
+  it. <!-- st: prio=low size=S labels=report,enhancement ver=main -->

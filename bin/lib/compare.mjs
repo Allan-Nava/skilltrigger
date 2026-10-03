@@ -9,6 +9,10 @@
 //
 // Two runs per query resolve to ±1 per query; a difference of one hit at two runs is
 // labelled noise, and so is a total difference of up to two hits.
+//
+// A positive marked needs_context (ST-15) is totalled apart from the positives, tagged
+// `ctx`; a query either report marks is grouped so on both sides, and a mark that differs
+// between the two is a warning.
 
 const rosterSize = (r) => (r?.roster ? r.roster.slashCommands : null)
 const fmtRoster = (r) => (r?.roster ? `${r.roster.slashCommands} slash commands${r.roster.skills == null ? '' : `, ${r.roster.skills} skills`}` : 'unknown')
@@ -64,14 +68,17 @@ export function deltas(a, b) {
   }
   for (const qb of b.queries) if (!seen.has(qb.query)) rows.push({ query: qb.query, should_trigger: qb.should_trigger, a: null, b: qb, only: 'b' })
 
+  for (const r of rows) if (r.a?.needs_context === true || r.b?.needs_context === true) r.needs_context = true
   const shared = rows.filter((r) => !r.only)
   const total = (pred) => {
-    const pick = (side) => shared.filter((r) => pred(r.should_trigger)).reduce((acc, r) => ({ hits: acc.hits + r[side].hits, runs: acc.runs + r[side].runs }), { hits: 0, runs: 0 })
+    const pick = (side) => shared.filter(pred).reduce((acc, r) => ({ hits: acc.hits + r[side].hits, runs: acc.runs + r[side].runs }), { hits: 0, runs: 0 })
     const ta = pick('a')
     const tb = pick('b')
     return { a: ta, b: tb, delta: tb.hits - ta.hits }
   }
-  return { rows, totals: { positives: total((s) => s), negatives: total((s) => !s) }, noiseAt }
+  const totals = { positives: total((r) => r.should_trigger && !r.needs_context), negatives: total((r) => !r.should_trigger) }
+  if (shared.some((r) => r.needs_context)) totals.needsContext = total((r) => r.needs_context)
+  return { rows, totals, noiseAt }
 }
 
 export function compare(a, b) {
@@ -87,9 +94,14 @@ export function compare(a, b) {
   const env = environmentDiff(a.environment, b.environment)
   if (env.length) warnings.push(`inherited environment differs: ${env.join(', ')} — memory files, hooks and MCP servers reach the model too`)
   for (const [k, r] of [['a', a], ['b', b]]) if (r.verdict !== 'ok') warnings.push(`report ${k} (${r.date}) has no verdict — its counts are not a measurement`)
+  // Pass and fail per query are judged at the report's threshold (ST-17); the hit counts
+  // compared below are not, but a pass column read across the two would be.
+  if (typeof a.triggerThreshold === 'number' && typeof b.triggerThreshold === 'number' && a.triggerThreshold !== b.triggerThreshold) warnings.push(`pass threshold differs: ${a.triggerThreshold} vs ${b.triggerThreshold} — pass and fail per query were judged differently; the hit counts below are unaffected`)
   if (a.conflictAllowed || b.conflictAllowed) warnings.push('a report was measured with --allow-conflict — a same-named skill was visible')
 
   const { rows, totals, noiseAt } = deltas(a, b)
+  const marked = rows.filter((r) => !r.only && (r.a.needs_context === true) !== (r.b.needs_context === true)).length
+  if (marked) warnings.push(`needs_context differs on ${marked} shared ${marked === 1 ? 'query' : 'queries'} — grouped apart on both sides by either report's mark`)
 
   const lines = [`skilltrigger compare — ${a.skill} ${a.date} (a) vs ${b.skill} ${b.date} (b)`, '']
   for (const w of warnings) lines.push(`warning: ${w}`)
@@ -97,7 +109,7 @@ export function compare(a, b) {
   if (a.description?.sha256 && b.description?.sha256) lines.push(a.description.sha256 === b.description.sha256 ? 'description: identical in both' : `description changed: ${a.description.bytes} → ${b.description.bytes} bytes`, '')
   const sign = (n) => (n > 0 ? `+${n}` : String(n))
   for (const r of rows) {
-    const tag = r.should_trigger ? 'pos' : 'neg'
+    const tag = r.needs_context ? 'ctx' : r.should_trigger ? 'pos' : 'neg'
     if (r.only) lines.push(`  ${tag}  only in ${r.only}: ${r[r.only].hits}/${r[r.only].runs}  ${r.query}`)
     else lines.push(`  ${tag}  ${r.a.hits}/${r.a.runs} → ${r.b.hits}/${r.b.runs}  ${r.delta === 0 ? ' 0' : sign(r.delta)}${r.noise ? ' (noise)' : ''}  ${r.query}`)
   }
@@ -105,5 +117,7 @@ export function compare(a, b) {
   const totalNoise = (d) => (totalIsNoise(d, noiseAt) ? ' (within noise)' : '')
   lines.push(`positives triggered ${totals.positives.a.hits}/${totals.positives.a.runs} → ${totals.positives.b.hits}/${totals.positives.b.runs} (${sign(totals.positives.delta)})${totalNoise(totals.positives.delta)}`)
   lines.push(`negatives fired ${totals.negatives.a.hits}/${totals.negatives.a.runs} → ${totals.negatives.b.hits}/${totals.negatives.b.runs} (${sign(totals.negatives.delta)})${totalNoise(totals.negatives.delta)}`)
+  const ctx = totals.needsContext
+  if (ctx) lines.push(`needs_context positives triggered ${ctx.a.hits}/${ctx.a.runs} → ${ctx.b.hits}/${ctx.b.runs} (${sign(ctx.delta)})${totalNoise(ctx.delta)}`)
   return { warnings, rows, totals, text: lines.join('\n') }
 }

@@ -16,8 +16,8 @@ export const EVALS = join(FIXTURES, 'evals', 'demo.json')
 export const PLUGIN = join(FIXTURES, 'plugin')
 const CLI = join(ROOT, 'bin', 'skilltrigger.mjs')
 
-// A lost executable bit would make PATH skip the fake and find a real claude.
-chmodSync(join(FAKE_DIR, 'claude'), 0o755)
+// A lost executable bit would make PATH skip a fake and find the real one.
+for (const f of ['claude', 'systemd-inhibit']) chmodSync(join(FAKE_DIR, f), 0o755)
 
 export function scratch() {
   const dir = mkdtempSync(join(tmpdir(), 'skilltrigger-test-'))

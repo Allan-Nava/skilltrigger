@@ -5,6 +5,29 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Added
+- `run --threshold <rate>`: the per-query pass threshold, 0.5 by default — a positive
+  passes at a trigger rate of at least that, a negative under it. It must lie strictly
+  between 0 and 1, and is recorded in the report's `triggerThreshold` as before. It
+  decides pass and fail per query only; the totals, the verdict and the exit code do not
+  read it. A paired run judges both sides at the one threshold, and `compare` warns when
+  two reports were judged at different ones (ST-17).
+- The sleep gate holds the machine awake on Linux: it runs a watcher of skilltrigger's
+  process under `systemd-inhibit --what=idle:sleep --mode=block --no-ask-password`, so
+  the lock is held for the run and released when skilltrigger exits, as `caffeinate -w`
+  does on macOS. Without systemd-inhibit, or when logind refuses the lock, the gate warns
+  with the reason, as before. Tested against a fake; not yet run on a live Linux host
+  (ST-16).
+- An eval-set field, `needs_context: true`, for a positive that presupposes material
+  already in a session. Such a prompt is run like any other and counted apart: out of
+  the positives total and the pass count, into its own group — `totals.needsContext` in
+  the JSON, `needs_context positives triggered` in the summary, a section of its own in
+  the Markdown, a `ctx` row and its own total in `compare` and in a paired report — so the
+  known limit of `claude -p` is a number rather than a footnote. Its runs still count
+  towards the no-verdict rule. The field marks positives only; `compare` warns when two
+  reports mark a shared query differently. An eval set without it gives the report it
+  always did (ST-15).
+
 ## [0.0.3] — 2026-10-03
 
 0.0.3 adds `--baseline-description` (ST-14) and still has not been run against a live

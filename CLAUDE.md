@@ -17,23 +17,29 @@ site build.
 ```
 bin/
   skilltrigger.mjs     the CLI: preflight, run, compare, check; exit codes 0/1/2/3
-  lib/args.mjs         argument parser (util.parseArgs is 18.3+, the floor is 18.0)
+  lib/args.mjs         argument parser (util.parseArgs is 18.3+, the floor is 18.0);
+                       `fraction()` holds --threshold strictly between 0 and 1 (ST-17)
   lib/claude.mjs       spawning claude: env minus CLAUDECODE, process-group kill
-  lib/gates.mjs        the six gates and their formatting
+  lib/gates.mjs        the six gates and their formatting; the sleep gate's caffeinate
+                       (macOS) and systemd-inhibit (Linux, ST-16)
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
   lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
   lib/toggles.mjs      the re-enable reminder: the gate's toggles, kept under --out
+  lib/skill.mjs        SKILL.md frontmatter and the eval set; `needs_context` marks a
+                       positive, and only a positive (ST-15)
   lib/stream.mjs       the detector: one run's events → an outcome
   lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run;
                        with a baseline, the two texts interleaved run by run (ST-14)
-  lib/report.mjs       summary, verdict rule, JSON + Markdown; the paired report
-  lib/compare.mjs      two reports, drift warnings, noise labels; `deltas()` is the
+  lib/report.mjs       summary, verdict rule, JSON + Markdown; the paired report; the
+                       needs_context group, counted apart (ST-15)
+  lib/compare.mjs      two reports, drift and threshold warnings, noise labels; `deltas()` is the
                        arithmetic the paired report shares with `compare`
   lib/check.mjs        the repository's own invariants (npm test)
   lib/traps.mjs        the six traps and the README phrase for each
   lib/changelog.mjs    the CHANGELOG, read (release notes, Breaking-first rule)
 test/
   fake/claude          the fake CLI, driven by FAKE_CLAUDE_* variables
+  fake/systemd-inhibit logs its arguments, runs the command, logs its exit (FAKE_INHIBIT_*)
   helpers.mjs          the fake environment and the CLI runner
   fixtures/            a skill, a plugin carrying the same skill, an eval set
   *.test.mjs           node --test
@@ -76,6 +82,22 @@ Do not weaken these; they are the tool's whole reason to exist.
    preflight — so a drift during the run lands on both sides alike. Running all the
    baseline first and the candidate after would reintroduce the drift the flag removes.
    A paired report keeps both sides as complete single reports; `compare` refuses it.
+9. **The pass threshold judges queries, never the run.** `--threshold` (ST-17, strictly
+   between 0 and 1, 0.5 by default) moves pass and fail per query and is recorded as
+   `triggerThreshold`; the totals, the verdict and the exit code do not read it. A paired
+   run judges both sides at the one threshold, and `compare` warns when two reports differ
+   in it.
+10. **The sleep gate holds the machine awake for this process only.** `caffeinate -w` on
+    macOS, `systemd-inhibit` running a watcher of this pid on Linux (ST-16): each lock
+    ends when skilltrigger exits, nothing persistent is changed and no password is asked
+    (`--no-ask-password`). On Linux a missing or refused inhibitor is a warning, as it was
+    before — many a headless machine has nothing to inhibit — never a failure.
+11. **A positive that presupposes a session is counted apart, never dropped.** An eval
+    item with `needs_context: true` (ST-15) is run like any other, then left out of the
+    positives total and the pass count and reported as its own group — `totals.needsContext`,
+    a `ctx` row in `compare`, its own Markdown section. Its runs still count towards the
+    no-verdict share and the lost-query rule: a timeout is the environment breaking,
+    whatever the prompt asked. An eval set without the field gives the report it always did.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 
@@ -94,6 +116,11 @@ run** — that is ST-12.
 - Partial events: `stream_event` wrapping `content_block_start` (tool_use with `name`),
   `content_block_delta` (`input_json_delta.partial_json`), `content_block_stop`,
   `message_stop`.
+
+`systemd-inhibit` (ST-16): `--what=idle:sleep --who= --why= --mode=block
+--no-ask-password`, and the command given after the options run while the lock is held,
+read off its man page — tested only against `test/fake/systemd-inhibit`, **not yet run on
+a live Linux host**.
 
 ## Verifying a change
 
