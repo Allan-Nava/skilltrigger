@@ -42,21 +42,12 @@ function environmentDiff(ea, eb) {
   return out
 }
 
-export function compare(a, b) {
-  const warnings = []
-  if (a.model !== b.model) warnings.push(`model differs: ${a.model} vs ${b.model}`)
-  if (a.runModels && b.runModels && Object.keys(a.runModels).length && Object.keys(b.runModels).length && !sameKeys(a.runModels, b.runModels)) {
-    warnings.push(`the models the runs reported differ: ${Object.keys(a.runModels).sort().join(', ')} vs ${Object.keys(b.runModels).sort().join(', ')}`)
-  }
-  if (a.cliVersion !== b.cliVersion) warnings.push(`CLI version differs: ${a.cliVersion} vs ${b.cliVersion}`)
-  if (rosterSize(a) !== rosterSize(b) || a.roster?.skills !== b.roster?.skills) warnings.push(`roster differs: ${fmtRoster(a)} vs ${fmtRoster(b)} — the number is a property of the text and the roster; re-measure the baseline in the same environment before judging a rewrite`)
-  const members = memberDiff(a, b)
-  if (members.length) warnings.push(`roster members differ (a → b) — ${members.join(' · ')}`)
-  const env = environmentDiff(a.environment, b.environment)
-  if (env.length) warnings.push(`inherited environment differs: ${env.join(', ')} — memory files, hooks and MCP servers reach the model too`)
-  for (const [k, r] of [['a', a], ['b', b]]) if (r.verdict !== 'ok') warnings.push(`report ${k} (${r.date}) has no verdict — its counts are not a measurement`)
-  if (a.conflictAllowed || b.conflictAllowed) warnings.push('a report was measured with --allow-conflict — a same-named skill was visible')
+export const totalIsNoise = (d, noiseAt) => d !== 0 && Math.abs(d) <= 2 && noiseAt
 
+// The arithmetic both `compare` and a paired run (ST-14) report: a row per query, its
+// delta and its noise label, and totals over the queries both sides share, so a query
+// added on one side does not pass for a change in the description.
+export function deltas(a, b) {
   const noiseAt = Math.min(a.runsPerQuery ?? 2, b.runsPerQuery ?? 2) <= 2
   const byQuery = new Map(b.queries.map((q) => [q.query, q]))
   const seen = new Set()
@@ -73,8 +64,6 @@ export function compare(a, b) {
   }
   for (const qb of b.queries) if (!seen.has(qb.query)) rows.push({ query: qb.query, should_trigger: qb.should_trigger, a: null, b: qb, only: 'b' })
 
-  // Totals over the queries both reports share, so a query added on one side does not
-  // pass for a change in the description.
   const shared = rows.filter((r) => !r.only)
   const total = (pred) => {
     const pick = (side) => shared.filter((r) => pred(r.should_trigger)).reduce((acc, r) => ({ hits: acc.hits + r[side].hits, runs: acc.runs + r[side].runs }), { hits: 0, runs: 0 })
@@ -82,7 +71,25 @@ export function compare(a, b) {
     const tb = pick('b')
     return { a: ta, b: tb, delta: tb.hits - ta.hits }
   }
-  const totals = { positives: total((s) => s), negatives: total((s) => !s) }
+  return { rows, totals: { positives: total((s) => s), negatives: total((s) => !s) }, noiseAt }
+}
+
+export function compare(a, b) {
+  const warnings = []
+  if (a.model !== b.model) warnings.push(`model differs: ${a.model} vs ${b.model}`)
+  if (a.runModels && b.runModels && Object.keys(a.runModels).length && Object.keys(b.runModels).length && !sameKeys(a.runModels, b.runModels)) {
+    warnings.push(`the models the runs reported differ: ${Object.keys(a.runModels).sort().join(', ')} vs ${Object.keys(b.runModels).sort().join(', ')}`)
+  }
+  if (a.cliVersion !== b.cliVersion) warnings.push(`CLI version differs: ${a.cliVersion} vs ${b.cliVersion}`)
+  if (rosterSize(a) !== rosterSize(b) || a.roster?.skills !== b.roster?.skills) warnings.push(`roster differs: ${fmtRoster(a)} vs ${fmtRoster(b)} — the number is a property of the text and the roster; re-measure the baseline in the same environment before judging a rewrite`)
+  const members = memberDiff(a, b)
+  if (members.length) warnings.push(`roster members differ (a → b) — ${members.join(' · ')}`)
+  const env = environmentDiff(a.environment, b.environment)
+  if (env.length) warnings.push(`inherited environment differs: ${env.join(', ')} — memory files, hooks and MCP servers reach the model too`)
+  for (const [k, r] of [['a', a], ['b', b]]) if (r.verdict !== 'ok') warnings.push(`report ${k} (${r.date}) has no verdict — its counts are not a measurement`)
+  if (a.conflictAllowed || b.conflictAllowed) warnings.push('a report was measured with --allow-conflict — a same-named skill was visible')
+
+  const { rows, totals, noiseAt } = deltas(a, b)
 
   const lines = [`skilltrigger compare — ${a.skill} ${a.date} (a) vs ${b.skill} ${b.date} (b)`, '']
   for (const w of warnings) lines.push(`warning: ${w}`)
@@ -95,7 +102,7 @@ export function compare(a, b) {
     else lines.push(`  ${tag}  ${r.a.hits}/${r.a.runs} → ${r.b.hits}/${r.b.runs}  ${r.delta === 0 ? ' 0' : sign(r.delta)}${r.noise ? ' (noise)' : ''}  ${r.query}`)
   }
   lines.push('')
-  const totalNoise = (d) => (d !== 0 && Math.abs(d) <= 2 && noiseAt ? ' (within noise)' : '')
+  const totalNoise = (d) => (totalIsNoise(d, noiseAt) ? ' (within noise)' : '')
   lines.push(`positives triggered ${totals.positives.a.hits}/${totals.positives.a.runs} → ${totals.positives.b.hits}/${totals.positives.b.runs} (${sign(totals.positives.delta)})${totalNoise(totals.positives.delta)}`)
   lines.push(`negatives fired ${totals.negatives.a.hits}/${totals.negatives.a.runs} → ${totals.negatives.b.hits}/${totals.negatives.b.runs} (${sign(totals.negatives.delta)})${totalNoise(totals.negatives.delta)}`)
   return { warnings, rows, totals, text: lines.join('\n') }

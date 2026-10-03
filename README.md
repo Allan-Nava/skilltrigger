@@ -57,14 +57,15 @@ node bin/skilltrigger.mjs preflight
 ```bash
 skilltrigger preflight [--model M] [--skill <dir>] [--out <dir>] [--allow-conflict]
 skilltrigger run --skill <dir> --eval <file> [--runs 2] [--model M] [--timeout 30] \
-                 [--description "<override>"] [--out <dir>] [--allow-conflict]
+                 [--description "<override>"] [--baseline-description <text|file>] \
+                 [--out <dir>] [--allow-conflict]
 skilltrigger compare <a.json> <b.json>
 skilltrigger check
 ```
 
 `preflight` runs every gate and prints each as `ok`, `warn`, `fail` or `skip`, with the reason and, for anything not ok, the fix. It exits 2 on any failure. Without `--skill` it has no name to look for, so the conflict gate only lists the enabled plugins. `--out` is where the re-enable reminder is kept (below); it defaults to `./skilltrigger-results`, as for `run`.
 
-`run` runs the preflight first and refuses on a failure, then runs every query `--runs` times (default 2), round-robin, serially, with a `--timeout` in seconds per run (default 30). `--description` measures an override instead of the text in `SKILL.md`, so a rewrite can be tried without editing the skill. Reports go to `--out` (default `./skilltrigger-results`). Exit codes: 0 a verdict, 1 a usage or input error, 2 a failed gate, 3 no verdict.
+`run` runs the preflight first and refuses on a failure, then runs every query `--runs` times (default 2), round-robin, serially, with a `--timeout` in seconds per run (default 30). `--description` measures an override instead of the text in `SKILL.md`, so a rewrite can be tried without editing the skill; `--baseline-description` measures the old text beside it in the same run (below). Reports go to `--out` (default `./skilltrigger-results`). Exit codes: 0 a verdict, 1 a usage or input error, 2 a failed gate, 3 no verdict.
 
 The eval set is skill-creator's format — a JSON array of `{ "query": string, "should_trigger": boolean }` — and any other field, a `note` for instance, is carried through to the report:
 
@@ -77,11 +78,23 @@ The eval set is skill-creator's format — a JSON array of `{ "query": string, "
 
 `compare` sets two reports side by side: per query and in total, over the queries both share. It warns first when the model, the models the runs reported, the CLI version, the roster or the inherited environment differ, because the number is a property of the text *and* the roster. Two rosters of the same size with different members are a warning that counts the members added and removed, by hash. Two runs per query resolve to ±1 per query, so a difference of one hit at two runs is labelled noise, and so is a total difference of up to two.
 
-To judge a rewrite, measure the baseline the same day, in the same environment, then the rewrite with `--description`, and compare the two.
+### Baseline and rewrite in one run
+
+To judge a rewrite, measure both texts in one invocation:
+
+```bash
+skilltrigger run --skill skills/handoff --eval evals/handoff.json \
+                 --baseline-description old/SKILL.md --description "$(cat new-description.txt)"
+```
+
+`--baseline-description` takes the old text itself, or a file: a `SKILL.md` gives the `description` in its frontmatter, any other file its whole content. The candidate is `--description` if given, the text in `SKILL.md` otherwise. The preflight runs once; then each query is run once with each text, back to back, and the order inside the pair flips every pass — baseline first, then candidate first — so the progress lines read `base`, `cand`, `cand`, `base`. The report carries both sides as complete reports, each with its own totals and verdict, and the comparison: per query, the baseline's hits, the candidate's and the delta, and the two totals, with the noise labels `compare` uses — ±1 per query at two runs, and up to two in a total. The no-verdict rule applies to each side: more than 10% of one side's runs timing out or failing stops the run, and a query that lost every run on either side is no verdict, for that side and so for the comparison — the deltas are then not printed. Measuring the same text on both sides is an A/A run, and every delta it shows is noise.
+
+This is the answer to the drift trap. Two reports measured apart differ in the description *and* in whatever moved between them: a byte-identical description measured 17/18 one week and 10/18 the next because the roster had grown (sixth trap), and the day, the CLI, the model the alias resolves to and the inherited environment move as well. `compare` can warn about the drifts it can see; it cannot remove them. Interleaved in one run, both texts share the day, the CLI, the model and the roster by construction, and a drift during the run — a model update, a skill synced in, a machine slowing down — lands on both sides alike, so the delta is the description's. Two separate runs remain possible, and `compare` still reads them; a paired report is refused by `compare`, since it carries its own comparison.
+
 
 ## The report
 
-Each run writes `<out>/<date>-<skill>.json` and a Markdown rendering beside it (a second report the same day gets `-2`). It holds the date, the skilltrigger and CLI versions, the model, the model each run's `init` event reported (per run, and counted in `runModels`), the roster — its counts and a hash of each member, sorted — a count of what the inherited environment contributed (memory files for the temporary project and for the user, hooks configured, MCP servers in the `init` event), runs per query, the timeout, the pass threshold (a trigger rate of 0.5) and the no-verdict threshold (10%), each query with every outcome and its hits/runs, and the totals — positives triggered, negatives fired, timeouts and errors counted apart — plus the queries that lost every run (`lostQueries`, which make it no verdict) and those measured on fewer runs than planned (`partialQueries`).
+Each run writes `<out>/<date>-<skill>.json` and a Markdown rendering beside it (a second report the same day gets `-2`). It holds the date, the skilltrigger and CLI versions, the model, the model each run's `init` event reported (per run, and counted in `runModels`), the roster — its counts and a hash of each member, sorted — a count of what the inherited environment contributed (memory files for the temporary project and for the user, hooks configured, MCP servers in the `init` event), runs per query, the timeout, the pass threshold (a trigger rate of 0.5) and the no-verdict threshold (10%), each query with every outcome and its hits/runs, and the totals — positives triggered, negatives fired, timeouts and errors counted apart — plus the queries that lost every run (`lostQueries`, which make it no verdict) and those measured on fewer runs than planned (`partialQueries`). A run with `--baseline-description` writes one paired report instead: `paired: true`, the environment fields once at the top, `baseline` and `candidate` each a complete report of the shape above with its own description hash, totals and verdict, and `comparison` — per query `{ baseline, candidate, delta, noise }` in hits/runs, and the positives and negatives totals in the same form. Its `verdict` is `ok` only when both sides have one.
 
 Nothing else is in it: no description text (a byte count and a SHA-256 stand in for it, so `compare` can tell two texts apart), no paths, no command, skill or stub names, no stderr, and of the environment only counts — never a memory file's contents, a hook command or a server name. The roster's members are the commands and skills installed on the machine that measured, private ones included, so each is recorded as the first 12 hex digits of its name's SHA-256: enough for `compare` to see that a member moved, not to say which. A hash hides a name from a reader, not from someone guessing it — a name anyone could guess is still guessable.
 

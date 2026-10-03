@@ -4,14 +4,14 @@
 
 > This page is **generated** from [BACKLOG.md](BACKLOG.md), the single source of truth for planned work. Regenerate it with `npm run roadmap` after editing the backlog — CI fails when the two disagree.
 
-**23 items · 16 shipped · 7 open · 2 milestones.**
+**23 items · 17 shipped · 6 open · 2 milestones.**
 
 ## At a glance
 
 | Milestone | Phase | Progress | Open | Shipped |
 |---|---|---|---|---|
 | **v0.1.0 — One honest number** | now | `########..` 83% | 3 | 15 |
-| **v0.2.0 — Same day, same roster** | next | `##........` 20% | 4 | 1 |
+| **v0.2.0 — Same day, same roster** | next | `####......` 40% | 3 | 2 |
 
 ## v0.1.0 — One honest number
 
@@ -37,7 +37,7 @@
 ## v0.2.0 — Same day, same roster
 
 - [x] **ST-23** — backlogsync by version, not by commit · low · S · project · `main`
-- [ ] **ST-14** — Baseline and rewrite in one invocation · high · M · runner, report, enhancement
+- [x] **ST-14** — Baseline and rewrite in one invocation · high · M · runner, report, enhancement · `main`
 - [ ] **ST-15** — Prompts that presuppose a session · med · S · report, enhancement
 - [ ] **ST-16** — Sleep inhibition on Linux · low · S · gates, enhancement
 - [ ] **ST-17** — A pass-threshold option · low · S · report, enhancement
