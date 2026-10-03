@@ -24,6 +24,10 @@
 //   FAKE_CLAUDE_MCP         how many MCP servers the init event lists (default 0)
 //   FAKE_CLAUDE_QUERIES     JSON: { "<query>": "<mode>" | ["<mode>", ...] } — an array
 //                           is consumed one entry per run of that query
+//   FAKE_CLAUDE_DESCRIPTIONS  JSON: { "<marker>": { "<query>": "<mode>" | [...] } } — a run
+//                           whose stub text contains <marker> takes its modes from that
+//                           map instead of FAKE_CLAUDE_QUERIES, with its own run counters,
+//                           so two descriptions measured in one invocation answer apart
 //   FAKE_CLAUDE_DEFAULT     the mode for a query not in the map (default miss)
 //   FAKE_CLAUDE_STATE       directory for the per-query run counters
 //   FAKE_CLAUDE_LOG         file to append one JSON line per -p invocation to
@@ -34,6 +38,7 @@
 // toolsearch-then-trigger, hang, auth-error, api-error, crash, hide-stub (the init
 // event does not list the stub).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 
 const env = process.env
@@ -96,7 +101,8 @@ const commandsDir = join(process.cwd(), '.claude', 'commands')
 const stubs = existsSync(commandsDir) ? readdirSync(commandsDir).filter((f) => f.endsWith('.md')) : []
 const stub = stubs[0]?.replace(/\.md$/, '') ?? null
 
-log({ prompt, model, stubs, stubText: stub ? readFileSync(join(commandsDir, stubs[0]), 'utf8') : null })
+const stubText = stub ? readFileSync(join(commandsDir, stubs[0]), 'utf8') : null
+log({ prompt, model, stubs, stubText })
 
 const roster = (hideStub = false) => {
   const commands = Array.from({ length: Number(env.FAKE_CLAUDE_COMMANDS ?? 5) }, (_, i) => `cmd-${i + 1}`)
@@ -132,14 +138,23 @@ if (prompt === 'Reply with exactly: pong') {
 // --- a query run -------------------------------------------------------------
 
 let mode = env.FAKE_CLAUDE_DEFAULT ?? 'miss'
-const map = env.FAKE_CLAUDE_QUERIES ? JSON.parse(env.FAKE_CLAUDE_QUERIES) : {}
+let map = env.FAKE_CLAUDE_QUERIES ? JSON.parse(env.FAKE_CLAUDE_QUERIES) : {}
+let counter = ''
+if (env.FAKE_CLAUDE_DESCRIPTIONS && stubText) {
+  const byText = JSON.parse(env.FAKE_CLAUDE_DESCRIPTIONS)
+  const marker = Object.keys(byText).find((m) => stubText.includes(m))
+  if (marker !== undefined) {
+    map = byText[marker]
+    counter = marker
+  }
+}
 if (prompt in map) {
   const m = map[prompt]
   if (Array.isArray(m)) {
     let n = 0
     if (env.FAKE_CLAUDE_STATE) {
       mkdirSync(env.FAKE_CLAUDE_STATE, { recursive: true })
-      const f = join(env.FAKE_CLAUDE_STATE, Buffer.from(prompt).toString('hex').slice(0, 60))
+      const f = join(env.FAKE_CLAUDE_STATE, createHash('sha256').update(`${counter}\0${prompt}`).digest('hex').slice(0, 32))
       n = existsSync(f) ? Number(readFileSync(f, 'utf8')) : 0
       writeFileSync(f, String(n + 1))
     }

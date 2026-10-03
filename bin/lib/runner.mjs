@@ -52,28 +52,40 @@ export async function runOnce({ query, skillName, description, model, timeoutMs,
 // Serial, query by query, run by run. Stops as soon as the timeouts and errors pass
 // the no-verdict share of the whole plan: from there no verdict is possible, and every
 // further run is spent on a number that will not be reported.
-export async function runAll({ items, runs, skillName, description, model, timeoutMs, env, noVerdictShare, onRun = () => {}, runOnceFn = runOnce }) {
-  const planned = items.length * runs
-  const outcomes = items.map(() => [])
-  // The model each run's init event reported, beside its outcome: an alias can resolve to
-  // a different model than the preflight saw (ST-20).
-  const models = items.map(() => [])
-  let bad = 0
+//
+// With a baseline (ST-14) each query is run once with each text, back to back, and the
+// order inside the pair flips every pass — baseline first on odd passes, candidate first
+// on even ones — so a drift over the hour (a model update, a roster change, a machine
+// slowing down) lands on both texts equally. The share is kept per side: one text past it
+// is no verdict for that side, so none for the comparison, and the run stops there.
+export async function runAll({ items, runs, skillName, description, baseline = null, model, timeoutMs, env, noVerdictShare, onRun = () => {}, runOnceFn = runOnce }) {
+  const sides = baseline === null ? [{ side: null, description }] : [{ side: 'baseline', description: baseline }, { side: 'candidate', description }]
+  const perSide = items.length * runs
+  const planned = perSide * sides.length
+  const state = sides.map(() => ({ outcomes: items.map(() => []), models: items.map(() => []), bad: 0 }))
   let done = 0
   let aborted = false
   outer: for (let r = 0; r < runs; r++) {
+    const order = r % 2 === 0 ? sides.map((_, k) => k) : sides.map((_, k) => k).reverse()
     for (const [i, item] of items.entries()) {
-      const res = await runOnceFn({ query: item.query, skillName, description, model, timeoutMs, env })
-      outcomes[i].push(res.outcome)
-      models[i].push(res.model ?? null)
-      done++
-      if (res.outcome === 'timeout' || res.outcome === 'error') bad++
-      onRun({ item, run: r + 1, done, planned, ...res })
-      if (bad > noVerdictShare * planned) {
-        aborted = done < planned
-        break outer
+      for (const k of order) {
+        const st = state[k]
+        const res = await runOnceFn({ query: item.query, skillName, description: sides[k].description, model, timeoutMs, env })
+        st.outcomes[i].push(res.outcome)
+        // The model each run's init event reported, beside its outcome: an alias can
+        // resolve to a different model than the preflight saw (ST-20).
+        st.models[i].push(res.model ?? null)
+        done++
+        if (res.outcome === 'timeout' || res.outcome === 'error') st.bad++
+        onRun({ item, run: r + 1, done, planned, side: sides[k].side, ...res })
+        if (st.bad > noVerdictShare * perSide) {
+          aborted = done < planned
+          break outer
+        }
       }
     }
   }
-  return { outcomes, models, planned, done, aborted }
+  if (baseline === null) return { outcomes: state[0].outcomes, models: state[0].models, planned, done, aborted }
+  const out = (k) => ({ outcomes: state[k].outcomes, models: state[k].models, planned: perSide, done: state[k].outcomes.reduce((a, o) => a + o.length, 0) })
+  return { baseline: out(0), candidate: out(1), planned, done, aborted }
 }

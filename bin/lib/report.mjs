@@ -1,13 +1,14 @@
 // The report: what was measured, against what, and whether it may be read at all.
 //
 // It carries the eval queries (and any extra fields they came with), the counts, the
-// versions, the roster's member names and the model each run reported — nothing else.
+// versions, the roster's member hashes and the model each run reported — nothing else.
 // No description text (a hash and a length stand in for it, so compare can tell two
 // texts apart), no paths, no stub names, no stderr; what the inherited environment
 // contributed is counted, never quoted.
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { deltas, totalIsNoise } from './compare.mjs'
 
 export const TRIGGER_THRESHOLD = 0.5
 export const NO_VERDICT_SHARE = 0.1
@@ -110,38 +111,142 @@ export function partialLine(rep) {
   return p.length ? `measured on fewer runs than planned: ${queriesWord(p.length)} — ${quoted(p)}` : null
 }
 
-export function toMarkdown(rep) {
-  const t = rep.totals
-  const roster = rep.roster ? `${rep.roster.slashCommands} slash commands${rep.roster.skills === null ? '' : `, ${rep.roster.skills} skills`}` : 'unknown'
-  const out = [
-    `# skilltrigger — ${rep.skill}, ${rep.date}`,
-    '',
-    rep.verdict === 'ok' ? `**${headline(rep)}**` : `**No verdict.** ${headline(rep).replace(/^no verdict: /, '')}. The per-query counts below are not a measurement.`,
-    '',
+const rosterCell = (rep) => (rep.roster ? `${rep.roster.slashCommands} slash commands${rep.roster.skills === null ? '' : `, ${rep.roster.skills} skills`}` : 'unknown')
+const descriptionCell = (d, note = '') => `${d.bytes} bytes, sha256 ${d.sha256.slice(0, 12)}${note}`
+const passCell = (q) => `${q.pass === null ? (q.outcomes.length ? 'lost every run' : '—') : q.pass ? 'pass' : 'fail'}${q.partial ? ` (${q.runs} of ${q.outcomes.length} runs)` : ''}`
+
+// The rows that say where a number was measured: the same in a single and a paired report.
+function environmentRows(rep, { runs, noVerdict, descriptions }) {
+  return [
     '| | |',
     '|---|---|',
     `| CLI | ${cell(rep.cliVersion)} |`,
     `| Model | ${cell(rep.model)} |`,
     `| Models the runs reported | ${cell(formatRunModels(rep.runModels))} |`,
-    `| Roster | ${roster} |`,
+    `| Roster | ${rosterCell(rep)} |`,
     `| Inherited environment | ${formatEnvironment(rep.environment)} |`,
-    `| Runs per query | ${rep.runsPerQuery} |`,
+    `| Runs per query | ${runs} |`,
     `| Timeout | ${rep.timeoutSeconds} s |`,
     `| Pass threshold | trigger rate ≥ ${rep.triggerThreshold} for a positive, < ${rep.triggerThreshold} for a negative |`,
-    `| No verdict when | timeouts + errors > ${pct(rep.noVerdictThreshold)} of runs, or any query lost every run |`,
-    `| Description | ${rep.description.bytes} bytes, sha256 ${rep.description.sha256.slice(0, 12)}${rep.description.overridden ? ', overridden with --description' : ''} |`,
+    `| No verdict when | ${noVerdict} |`,
+    ...descriptions,
     ...(rep.conflictAllowed ? ['| Plugin conflict | **allowed with --allow-conflict** — a same-named skill was visible during the runs |'] : []),
     `| Version | skilltrigger ${rep.toolVersion} |`,
+  ]
+}
+
+export function toMarkdown(rep) {
+  if (rep.paired) return pairedMarkdown(rep)
+  const t = rep.totals
+  const out = [
+    `# skilltrigger — ${rep.skill}, ${rep.date}`,
+    '',
+    rep.verdict === 'ok' ? `**${headline(rep)}**` : `**No verdict.** ${headline(rep).replace(/^no verdict: /, '')}. The per-query counts below are not a measurement.`,
+    '',
+    ...environmentRows(rep, {
+      runs: rep.runsPerQuery,
+      noVerdict: `timeouts + errors > ${pct(rep.noVerdictThreshold)} of runs, or any query lost every run`,
+      descriptions: [`| Description | ${descriptionCell(rep.description, rep.description.overridden ? ', overridden with --description' : '')} |`],
+    }),
     '',
     '| Query | Should trigger | Hits/runs | Timeouts | Errors | Pass |',
     '|---|---|---:|---:|---:|---|',
-    ...rep.queries.map((q) => {
-      const pass = q.pass === null ? (q.outcomes.length ? 'lost every run' : '—') : q.pass ? 'pass' : 'fail'
-      return `| ${cell(q.query)} | ${q.should_trigger ? 'yes' : 'no'} | ${q.hits}/${q.runs} | ${q.timeouts} | ${q.errors} | ${pass}${q.partial ? ` (${q.runs} of ${q.outcomes.length} runs)` : ''} |`
-    }),
+    ...rep.queries.map((q) => `| ${cell(q.query)} | ${q.should_trigger ? 'yes' : 'no'} | ${q.hits}/${q.runs} | ${q.timeouts} | ${q.errors} | ${passCell(q)} |`),
     '',
     ...(partialLine(rep) ? [`${cell(partialLine(rep).replace(/^m/, 'M'))}.`, ''] : []),
     `${t.passed} of ${t.queries} queries pass. Two runs per query resolve to ±1 per query: read a difference of one hit as noise.`,
+    '',
+  ]
+  return out.join('\n')
+}
+
+// --- a paired run (ST-14) ------------------------------------------------------------
+//
+// The baseline and the candidate measured in one invocation, interleaved run by run. Each
+// side is a complete single report — the same summarise(), the same verdict rule — and the
+// comparison is compare's own arithmetic, per-query deltas and noise labels included. The
+// verdict is the comparison's: no verdict on either side is no verdict for both.
+export const INTERLEAVING = 'each query once with each description, back to back; the order inside the pair flips every pass'
+
+// What both sides share by construction, lifted to the top of the paired report.
+const SHARED = ['tool', 'toolVersion', 'date', 'skill', 'cliVersion', 'model', 'roster', 'environment', 'runsPerQuery', 'timeoutSeconds', 'triggerThreshold', 'noVerdictThreshold', 'conflictAllowed']
+
+export function summarisePaired({ items, skillName, baseline, candidate, baselineDescription, description, overridden, facts, runsPerQuery, timeoutSeconds, aborted, toolVersion, date = localDate() }) {
+  const common = { items, skillName, facts, runsPerQuery, timeoutSeconds, planned: items.length * runsPerQuery, aborted, toolVersion, date }
+  const base = summarise({ ...common, outcomes: baseline.outcomes, models: baseline.models, description: baselineDescription, overridden: false })
+  const cand = summarise({ ...common, outcomes: candidate.outcomes, models: candidate.models, description, overridden })
+  const d = deltas(base, cand)
+  const hr = (x) => ({ hits: x.hits, runs: x.runs })
+  const total = (t) => ({ baseline: hr(t.a), candidate: hr(t.b), delta: t.delta, noise: totalIsNoise(t.delta, d.noiseAt) })
+  const runModels = {}
+  for (const side of [base, cand]) for (const [m, n] of Object.entries(side.runModels)) runModels[m] = (runModels[m] ?? 0) + n
+  return {
+    ...Object.fromEntries(SHARED.map((k) => [k, cand[k]])),
+    runModels,
+    paired: true,
+    interleaving: INTERLEAVING,
+    verdict: base.verdict === 'ok' && cand.verdict === 'ok' ? 'ok' : 'no-verdict',
+    aborted: Boolean(aborted),
+    baseline: base,
+    candidate: cand,
+    comparison: {
+      rows: d.rows.map((r) => ({ query: r.query, should_trigger: r.should_trigger, baseline: hr(r.a), candidate: hr(r.b), delta: r.delta, noise: r.noise })),
+      totals: { positives: total(d.totals.positives), negatives: total(d.totals.negatives) },
+    },
+  }
+}
+
+const sign = (n) => (n > 0 ? `+${n}` : String(n))
+const deltaCell = (r) => `${sign(r.delta)}${r.noise ? ' (noise)' : ''}`
+const totalLine = (label, t) => `${label} ${t.baseline.hits}/${t.baseline.runs} → ${t.candidate.hits}/${t.candidate.runs} (${sign(t.delta)})${t.noise ? ' (within noise)' : ''}`
+
+// The lines `run` prints at the end of a paired run: each side's headline, then — when
+// there is a verdict — the deltas, per query and in total.
+export function pairedLines(rep) {
+  const lines = [`baseline   ${headline(rep.baseline)}`, `candidate  ${headline(rep.candidate)}`]
+  for (const [k, side] of [['baseline', rep.baseline], ['candidate', rep.candidate]]) if (partialLine(side)) lines.push(`${k}: ${partialLine(side)}`)
+  if (rep.verdict !== 'ok') {
+    lines.push('no verdict: a side without one leaves nothing to compare — the deltas are not printed')
+    return lines
+  }
+  lines.push('')
+  for (const r of rep.comparison.rows) lines.push(`  ${r.should_trigger ? 'pos' : 'neg'}  ${r.baseline.hits}/${r.baseline.runs} → ${r.candidate.hits}/${r.candidate.runs}  ${r.delta === 0 ? ' 0' : deltaCell(r)}  ${r.query}`)
+  lines.push('')
+  lines.push(totalLine('positives triggered', rep.comparison.totals.positives))
+  lines.push(totalLine('negatives fired', rep.comparison.totals.negatives))
+  return lines
+}
+
+function pairedMarkdown(rep) {
+  const { baseline: b, candidate: c, comparison } = rep
+  const bq = new Map(b.queries.map((q) => [q.query, q]))
+  const cq = new Map(c.queries.map((q) => [q.query, q]))
+  const sideVerdict = (k, side) => `${k}: ${side.verdict === 'ok' ? 'a verdict' : headline(side)}`
+  const out = [
+    `# skilltrigger — ${rep.skill}, ${rep.date}, baseline vs candidate`,
+    '',
+    rep.verdict === 'ok'
+      ? `**${totalLine('positives triggered', comparison.totals.positives)} · ${totalLine('negatives fired', comparison.totals.negatives)}**`
+      : `**No verdict.** ${cell([sideVerdict('baseline', b), sideVerdict('candidate', c)].join('; '))}. The per-query counts below are not a measurement.`,
+    '',
+    ...environmentRows(rep, {
+      runs: `${rep.runsPerQuery} per description, interleaved — ${INTERLEAVING}`,
+      noVerdict: `on either side, timeouts + errors > ${pct(rep.noVerdictThreshold)} of its runs, or any query lost every run`,
+      descriptions: [`| Baseline | ${descriptionCell(b.description, ', from --baseline-description')} |`, `| Candidate | ${descriptionCell(c.description, c.description.overridden ? ', overridden with --description' : ', the text in SKILL.md')} |`],
+    }),
+    '',
+    '| Query | Should trigger | Baseline | Candidate | Delta | Baseline pass | Candidate pass |',
+    '|---|---|---:|---:|---:|---|---|',
+    ...comparison.rows.map((r) => `| ${cell(r.query)} | ${r.should_trigger ? 'yes' : 'no'} | ${r.baseline.hits}/${r.baseline.runs} | ${r.candidate.hits}/${r.candidate.runs} | ${r.delta === 0 ? '0' : deltaCell(r)} | ${passCell(bq.get(r.query))} | ${passCell(cq.get(r.query))} |`),
+    '',
+    `- baseline: ${cell(headline(b))}`,
+    `- candidate: ${cell(headline(c))}`,
+    '',
+    totalLine('positives triggered', comparison.totals.positives),
+    '',
+    totalLine('negatives fired', comparison.totals.negatives),
+    '',
+    `Baseline: ${b.totals.passed} of ${b.totals.queries} queries pass; candidate: ${c.totals.passed} of ${c.totals.queries}. Two runs per query resolve to ±1 per query: a difference of one hit is labelled noise, and so is a total difference of up to two.`,
     '',
   ]
   return out.join('\n')

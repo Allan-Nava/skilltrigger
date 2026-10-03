@@ -24,9 +24,11 @@ bin/
   lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
   lib/toggles.mjs      the re-enable reminder: the gate's toggles, kept under --out
   lib/stream.mjs       the detector: one run's events → an outcome
-  lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run
-  lib/report.mjs       summary, verdict rule, JSON + Markdown
-  lib/compare.mjs      two reports, drift warnings, noise labels
+  lib/runner.mjs       the serial runner: temp project, stub, one claude -p per run;
+                       with a baseline, the two texts interleaved run by run (ST-14)
+  lib/report.mjs       summary, verdict rule, JSON + Markdown; the paired report
+  lib/compare.mjs      two reports, drift warnings, noise labels; `deltas()` is the
+                       arithmetic the paired report shares with `compare`
   lib/check.mjs        the repository's own invariants (npm test)
   lib/traps.mjs        the six traps and the README phrase for each
   lib/changelog.mjs    the CHANGELOG, read (release notes, Breaking-first rule)
@@ -56,7 +58,9 @@ Do not weaken these; they are the tool's whole reason to exist.
    `error`. A run whose `init` event does not list the stub is `error`.
 4. **More than 10% timeouts and errors is no verdict**, exit 3, and the run stops as
    soon as that share of the plan is passed. **So is a query that lost every run** — the
-   share counts runs, not queries, and must not hide a whole query (ST-19).
+   share counts runs, not queries, and must not hide a whole query (ST-19). In a paired
+   run (`--baseline-description`, ST-14) the rule holds **per side**, and either side
+   without a verdict is no verdict for the comparison.
 5. **Nothing under `~/.claude` is written.** Runs live in `mkdtemp` directories that
    are removed; every `claude -p` gets `--no-session-persistence`. Plugin install
    directories are read, never written.
@@ -67,6 +71,11 @@ Do not weaken these; they are the tool's whole reason to exist.
 7. **The report carries queries, counts and versions only** — plus the roster's member
    hashes (12 hex digits of each name's SHA-256 — a roster names private skills) and the
    model each run reported (ST-20); no description text, no paths, no names, no stderr. The inherited environment is counted, never quoted.
+8. **A baseline is measured interleaved, never in a second pass.** Each query runs once
+   with each text, back to back, the order inside the pair flipping every pass, under one
+   preflight — so a drift during the run lands on both sides alike. Running all the
+   baseline first and the candidate after would reintroduce the drift the flag removes.
+   A paired report keeps both sides as complete single reports; `compare` refuses it.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 

@@ -153,10 +153,18 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   Done 2026-10-01: the action and the reusable workflow at `@backlogsync--v0.1.0`, the
   scripts on `npx backlogsync@0.1.0`.
   <!-- st: prio=low size=S labels=project ver=main -->
-- [ ] **ST-14 — Baseline and rewrite in one invocation**: `run --baseline-description`
+- [x] **ST-14 — Baseline and rewrite in one invocation**: `run --baseline-description`
   measures the old text and the new one interleaved, run by run, in one preflight, so
   both numbers share the day, the CLI, the model and the roster by construction, and the
-  report carries both. <!-- st: prio=high size=M labels=runner,report,enhancement -->
+  report carries both. Done 2026-10-03: the flag takes the text or a file (a `SKILL.md`
+  gives its description); each query runs once with each text, back to back, the order
+  flipping every pass (`runAll` in `bin/lib/runner.mjs`); the no-verdict share and the
+  lost-query rule hold per side, either side without a verdict is none for the
+  comparison; the paired report (`summarisePaired` in `bin/lib/report.mjs`) carries both
+  sides as complete reports and the per-query deltas with `compare`'s noise labels, from
+  the `deltas()` the two now share; `compare` refuses a paired report. The fake tells the
+  texts apart with `FAKE_CLAUDE_DESCRIPTIONS`.
+  <!-- st: prio=high size=M labels=runner,report,enhancement ver=main -->
 - [ ] **ST-15 — Prompts that presuppose a session**: an eval-set field (`needs_context`)
   for positives that assume material already in context, reported apart, so the known
   limit of `claude -p` is a column rather than a footnote.

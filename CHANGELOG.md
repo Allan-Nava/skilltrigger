@@ -5,6 +5,21 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
 
 ## [Unreleased]
 
+### Added
+- `run --baseline-description <text|file>`: the old description and the new one measured
+  in one invocation, under one preflight, interleaved run by run — each query once with
+  each text, back to back, the order inside the pair flipping every pass — so both numbers
+  share the day, the CLI, the model and the roster by construction, and a drift during the
+  run lands on both alike. A file is read whole, or for its frontmatter `description` when
+  it is a `SKILL.md`. The paired report carries both sides as complete reports and the
+  comparison: per-query deltas and the two totals, with `compare`'s noise labels. The
+  no-verdict rule holds per side, and either side without a verdict is no verdict, exit 3.
+  A run without the flag, and its report, are unchanged; `compare` still takes single
+  reports and refuses a paired one (ST-14).
+
+### Fixed
+- `skilltrigger help` no longer prints the first `import` line under the usage.
+
 ### Changed
 - backlogsync is pinned to its 0.1.0 release instead of a commit: the CI `backlog` job,
   `backlog-issues.yml` and `release-drift.yml` at `@backlogsync--v0.1.0`, `npm run backlog`

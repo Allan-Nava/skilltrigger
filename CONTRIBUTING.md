@@ -36,8 +36,9 @@ skilltrigger preflight --skill <skill dir> --model <model>
 skilltrigger run --skill <skill dir> --eval <eval set> --model <model>
 ```
 
-Read the report's roster, CLI and model lines before the rate, and compare a rewrite
-only against a baseline measured the same day (`skilltrigger compare`). Results worth
+Read the report's roster, CLI and model lines before the rate, and judge a rewrite
+against its baseline measured in the same run (`--baseline-description`), or at least
+the same day (`skilltrigger compare`). Results worth
 keeping are copied, dated, into the documentation they are about; `skilltrigger-results/`
 is gitignored.
 
