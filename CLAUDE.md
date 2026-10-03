@@ -20,7 +20,8 @@ bin/
   lib/args.mjs         argument parser (util.parseArgs is 18.3+, the floor is 18.0);
                        `fraction()` holds --threshold strictly between 0 and 1 (ST-17)
   lib/claude.mjs       spawning claude: env minus CLAUDECODE, process-group kill
-  lib/gates.mjs        the six gates and their formatting
+  lib/gates.mjs        the six gates and their formatting; the sleep gate's caffeinate
+                       (macOS) and systemd-inhibit (Linux, ST-16)
   lib/plugins.mjs      plugin list parsing, a plugin's skills, conflicts, the fix text
   lib/environment.mjs  memory files, hooks and MCP servers the runs inherit, counted
   lib/toggles.mjs      the re-enable reminder: the gate's toggles, kept under --out
@@ -35,6 +36,7 @@ bin/
   lib/changelog.mjs    the CHANGELOG, read (release notes, Breaking-first rule)
 test/
   fake/claude          the fake CLI, driven by FAKE_CLAUDE_* variables
+  fake/systemd-inhibit logs its arguments, runs the command, logs its exit (FAKE_INHIBIT_*)
   helpers.mjs          the fake environment and the CLI runner
   fixtures/            a skill, a plugin carrying the same skill, an eval set
   *.test.mjs           node --test
@@ -82,6 +84,11 @@ Do not weaken these; they are the tool's whole reason to exist.
    `triggerThreshold`; the totals, the verdict and the exit code do not read it. A paired
    run judges both sides at the one threshold, and `compare` warns when two reports differ
    in it.
+10. **The sleep gate holds the machine awake for this process only.** `caffeinate -w` on
+    macOS, `systemd-inhibit` running a watcher of this pid on Linux (ST-16): each lock
+    ends when skilltrigger exits, nothing persistent is changed and no password is asked
+    (`--no-ask-password`). On Linux a missing or refused inhibitor is a warning, as it was
+    before — many a headless machine has nothing to inhibit — never a failure.
 
 ## Facts the code depends on (dated — re-verify against a live CLI)
 
@@ -100,6 +107,11 @@ run** — that is ST-12.
 - Partial events: `stream_event` wrapping `content_block_start` (tool_use with `name`),
   `content_block_delta` (`input_json_delta.partial_json`), `content_block_stop`,
   `message_stop`.
+
+`systemd-inhibit` (ST-16): `--what=idle:sleep --who= --why= --mode=block
+--no-ask-password`, and the command given after the options run while the lock is held,
+read off its man page — tested only against `test/fake/systemd-inhibit`, **not yet run on
+a live Linux host**.
 
 ## Verifying a change
 

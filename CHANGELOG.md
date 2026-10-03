@@ -12,6 +12,12 @@ versions follow [SemVer](https://semver.org/). Items reference their `ST-n` back
   decides pass and fail per query only; the totals, the verdict and the exit code do not
   read it. A paired run judges both sides at the one threshold, and `compare` warns when
   two reports were judged at different ones (ST-17).
+- The sleep gate holds the machine awake on Linux: it runs a watcher of skilltrigger's
+  process under `systemd-inhibit --what=idle:sleep --mode=block --no-ask-password`, so
+  the lock is held for the run and released when skilltrigger exits, as `caffeinate -w`
+  does on macOS. Without systemd-inhibit, or when logind refuses the lock, the gate warns
+  with the reason, as before. Tested against a fake; not yet run on a live Linux host
+  (ST-16).
 
 ## [0.0.3] — 2026-10-03
 

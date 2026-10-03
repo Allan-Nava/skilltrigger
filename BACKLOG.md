@@ -170,8 +170,13 @@ advice in 0.1.0. This milestone makes it the default way to judge a rewrite.
   for positives that assume material already in context, reported apart, so the known
   limit of `claude -p` is a column rather than a footnote.
   <!-- st: prio=med size=S labels=report,enhancement -->
-- [ ] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
-  is available instead of only warning. <!-- st: prio=low size=S labels=gates,enhancement -->
+- [x] **ST-16 — Sleep inhibition on Linux**: wrap the run in `systemd-inhibit` when it
+  is available instead of only warning. Done 2026-10-03: the sleep gate (`inhibitGate`
+  in `bin/lib/gates.mjs`) runs a node watcher of skilltrigger's pid under `systemd-inhibit
+  --what=idle:sleep --mode=block --no-ask-password`, ok once the watcher says it started,
+  released when the process exits; not found, refused or silent for 10 s is the warning
+  it was. Tested through `test/fake/systemd-inhibit` on PATH; not yet run on a live Linux
+  host. <!-- st: prio=low size=S labels=gates,enhancement ver=main -->
 - [x] **ST-17 — A pass-threshold option**: `--threshold` for the per-query rate (0.5
   today), recorded in the report as it already is. Done 2026-10-03: `run --threshold`,
   strictly between 0 and 1 (`fraction()` in `bin/lib/args.mjs`), reaches `summarise` and

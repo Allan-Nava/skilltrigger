@@ -1,0 +1,24 @@
+#!/bin/sh
+# A fake `systemd-inhibit` for the tests (ST-16). It takes no lock: it writes its
+# arguments to FAKE_INHIBIT_LOG, runs the command it was given as the real one would,
+# and appends that command's exit status, so a test sees the lock taken and released.
+# It sits first on PATH with the fake claude, so no test reaches the host's own.
+#
+#   FAKE_INHIBIT_LOG   file to write the arguments and "exited <code>" to
+#   FAKE_INHIBIT       ok | fail   (default ok) — fail answers as logind refusing the lock
+log="${FAKE_INHIBIT_LOG:-/dev/null}"
+printf '%s\n' "$*" > "$log"
+if [ "${FAKE_INHIBIT:-ok}" = fail ]; then
+  echo "Failed to inhibit: Access denied" >&2
+  exit 1
+fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --*) shift ;;
+    *) break ;;
+  esac
+done
+"$@"
+code=$?
+echo "exited $code" >> "$log"
+exit $code
