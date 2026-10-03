@@ -10,7 +10,7 @@
 //   skilltrigger check
 //
 // Exit codes: 0 done · 1 usage or input error · 2 a gate failed · 3 no verdict.
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { UsageError, number, parseArgs } from './lib/args.mjs'
@@ -37,9 +37,16 @@ const DEFAULT_OUT = 'skilltrigger-results'
 // --baseline-description takes the text itself or a file: a SKILL.md gives the description
 // in its frontmatter (the old version of the skill, checked out beside the new), any other
 // file its whole content.
+// One read, no exists-then-read: a value that names no readable file is the text itself.
+const NOT_A_FILE = new Set(['ENOENT', 'EISDIR', 'ENOTDIR', 'ENAMETOOLONG', 'EINVAL', 'ERR_INVALID_ARG_VALUE', 'ERR_INVALID_ARG_TYPE'])
 function baselineText(value) {
-  if (!existsSync(value) || !statSync(value).isFile()) return value
-  const text = readFileSync(value, 'utf8')
+  let text
+  try {
+    text = readFileSync(value, 'utf8')
+  } catch (e) {
+    if (NOT_A_FILE.has(e.code)) return value
+    throw new UsageError(`--baseline-description: ${value} could not be read (${e.code ?? e.message})`)
+  }
   const fm = parseFrontmatter(text)
   if (fm) {
     if (!fm.description) throw new UsageError(`--baseline-description: ${value} has frontmatter but no description in it`)
